@@ -1,0 +1,49 @@
+=== TABLA DE SIMBOLOS: Global ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+func1                float        funcion         1
+_func2_              bool         funcion         6
+
+=== TABLA DE SIMBOLOS: Global / funcion func1 ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+x22                  char         parametro       1
+numero               float        variable        2
+
+=== TABLA DE SIMBOLOS: Global / funcion _func2_ ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+_b1_                 bool         parametro       6
+_i1_                 int          parametro       6
+temporal             int          variable        7
+
+=== TABLA DE SIMBOLOS: Global / principal ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+contador             int          variable        12
+decimal              float        variable        13
+bandera              bool         variable        14
+letra                char         variable        15
+arreglo              int[]        arreglo         16
+sinIdentificador     int          variable        39
+
+=== TABLA DE SIMBOLOS: Global / principal / Bloque 1 ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+local                int          variable        19
+
+=== TABLA DE SIMBOLOS: Global / principal / Bloque 2 ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+local                int          variable        22
+
+=== TABLA DE SIMBOLOS: Global / principal / Bloque 3 ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+local                int          variable        25
+
+=== TABLA DE SIMBOLOS: Global / principal / Bloque 4 ===
+Nombre               Tipo         Categoria       Linea
+------               ----         ---------       -----
+(sin simbolos)
+

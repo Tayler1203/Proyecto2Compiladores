@@ -1,0 +1,18 @@
+# Archivos generados por JFlex
+**/Lexer.java
+**/Parser.java
+
+# Archivos generados por CUP
+**/*.sym
+
+# Archivos compilados de Java
+**/*.class
+
+# Directorios de compilación
+**/bin/
+**/out/
+**/build/
+
+# Archivos de backup de editores de texto
+*~
+**/*~

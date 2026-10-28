@@ -1,0 +1,6 @@
+[ERROR SINTACTICO] Linea 8, columna 11: token inesperado -> '»'
+[ERROR SINTACTICO] Linea 36, columna 21: token inesperado -> ','
+[ERROR SINTACTICO] Linea 37, columna 37: token inesperado -> '»'
+[ERROR SINTACTICO] Linea 38, columna 37: token inesperado -> '--'
+[ERROR SINTACTICO] Linea 40, columna 15: token inesperado -> 'Ͱ'
+[ERROR SINTACTICO] Linea 42, columna 5: token inesperado -> 'write'

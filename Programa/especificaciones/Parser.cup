@@ -1,0 +1,1044 @@
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import java.util.List;
+
+parser code {:
+
+    public List<String> erroresSintacticos = new ArrayList<>();
+
+    private final TablaSimbolos tablaSimbolos = new TablaSimbolos();
+
+    public TablaSimbolos getTablaSimbolos() {
+        return tablaSimbolos;
+    }
+
+    public boolean huboErrorSintactico() {
+        return !erroresSintacticos.isEmpty();
+    }
+
+    public void syntax_error(Symbol s) {
+
+        String lexema =
+            (s != null && s.value != null)
+            ? String.valueOf(s.value)
+            : "EOF";
+
+        int linea =
+            (s != null && s.left >= 0)
+            ? s.left
+            : -1;
+
+        int columna =
+            (s != null && s.right >= 0)
+            ? s.right
+            : -1;
+
+        String mensaje;
+
+        if (s != null && s.sym == sym.EOF) {
+            mensaje =
+                "[ERROR SINTACTICO] Linea "
+                + linea
+                + ", columna "
+                + columna
+                + ": fin de archivo inesperado.";
+        } else {
+            mensaje =
+                "[ERROR SINTACTICO] Linea "
+                + linea
+                + ", columna "
+                + columna
+                + ": token inesperado -> '"
+                + lexema
+                + "'";
+        }
+
+        System.err.println(mensaje);
+        erroresSintacticos.add(mensaje);
+    }
+
+    public void unrecovered_syntax_error(Symbol s) {
+
+        int linea =
+            (s != null && s.left >= 0)
+            ? s.left
+            : -1;
+
+        int columna =
+            (s != null && s.right >= 0)
+            ? s.right
+            : -1;
+
+        String mensaje =
+            "[ERROR SINTACTICO IRRECUPERABLE] Linea "
+            + linea
+            + ", columna "
+            + columna
+            + ": no se pudo continuar el analisis.";
+
+        System.err.println(mensaje);
+        erroresSintacticos.add(mensaje);
+    }
+
+:};
+
+
+/* ==========================================
+   TERMINALES
+   ========================================== */
+
+terminal INT, FLOAT, BOOL, CHAR, STRING, VOID;
+
+terminal PRINCIPAL, IF, ELIF, ELSE, WHILE, FOR;
+terminal RETURN, BREAK, VAL, READ, WRITE;
+
+terminal INCREMENTO, DECREMENTO;
+terminal DIVISION_ENTERA;
+
+terminal SUMA, RESTA;
+terminal MULTIPLICACION, DIVISION;
+terminal MODULO, POTENCIA;
+
+terminal MENOR_IGUAL, MAYOR_IGUAL;
+terminal IGUAL, DIFERENTE;
+terminal MENOR, MAYOR;
+
+terminal AND, OR, NOT;
+
+terminal ASIGNACION;
+
+terminal BLOQUE_INI, BLOQUE_FIN;
+terminal PAR_INI, PAR_FIN;
+terminal COR_INI, COR_FIN;
+terminal FIN_EXPR;
+terminal COMA;
+
+terminal LIT_BOOL;
+terminal LIT_CHAR;
+terminal LIT_STRING;
+terminal LIT_FLOAT;
+terminal LIT_INT;
+
+terminal ID;
+
+
+/* ==========================================
+   NO TERMINALES
+   ========================================== */
+
+non terminal PROGRAMA;
+
+non terminal LISTA_ELEMENTOS;
+non terminal ELEMENTO_PROGRAMA;
+
+non terminal DECLARACION_GLOBAL;
+
+non terminal FUNCION_MAIN;
+
+non terminal DECLARACION_FUNCION;
+
+non terminal String TIPO_RETORNO;
+
+non terminal PARAMETROS;
+non terminal PARAMETRO;
+
+non terminal ARGUMENTOS;
+non terminal ARGUMENTO;
+
+non terminal LLAMADA_FUNCION;
+
+non terminal BLOQUE;
+non terminal BLOQUE_FUNCION;
+
+non terminal LISTA_SENTENCIAS;
+non terminal SENTENCIA;
+
+non terminal DECLARACION_VAR_SIMPLE;
+non terminal DECLARACION_VAR_ASIGNADA;
+
+non terminal ARREGLO;
+non terminal ARREGLO_INT;
+non terminal ARREGLO_FLOAT;
+
+non terminal ASIGNACION_ARREGLO;
+non terminal ACCESO_ARREGLO;
+
+non terminal TAMANO_ARREGLO;
+non terminal LISTA_INT;
+non terminal LISTA_FLOAT;
+non terminal INDICE;
+
+non terminal ASIGNACION_VAR;
+non terminal ASIGNACION_VAR_SIN_FIN;
+
+non terminal EXPR_SIN_ASIGNACION;
+
+non terminal EXPRESION;
+
+
+/* ==========================================
+   EXPRESIONES ARITMETICAS
+   ========================================== */
+
+non terminal OP_NEG;
+
+non terminal EXPR_NEGATIVO;
+non terminal EXPR_INCREMENTO;
+non terminal EXPR_DECREMENTO;
+
+non terminal OPERANDO;
+
+non terminal EXPR_POTENCIA;
+non terminal EXPR_SUMA_RESTA;
+non terminal EXPR_MULT_DIV;
+non terminal EXPR_ARITMETICA;
+
+
+/* ==========================================
+   EXPRESIONES RELACIONALES
+   ========================================== */
+
+non terminal OPERANDO_RELACIONAL;
+non terminal EXPR_RELACIONAL;
+
+
+/* ==========================================
+   EXPRESIONES LOGICAS
+   ========================================== */
+
+non terminal OPERANDO_LOGICO;
+non terminal EXPR_LOGICA;
+non terminal EXPR_NEGACION_LOGICA;
+non terminal GRUPO_PARENTESIS;
+
+
+/* ==========================================
+   CONTROL DE FLUJO
+   ========================================== */
+
+non terminal SENTENCIA_IF;
+non terminal SENTENCIA_IF_RESTO;
+non terminal SENTENCIA_ELIF_LISTA;
+
+non terminal SENTENCIA_WHILE;
+
+non terminal SENTENCIA_FOR;
+non terminal SENTENCIA_FOR_INIT;
+non terminal SENTENCIA_FOR_INCREMENTO;
+
+
+/* ==========================================
+   ENTRADA Y SALIDA
+   ========================================== */
+
+non terminal SENTENCIA_READ;
+non terminal SENTENCIA_WRITE;
+non terminal OPERANDO_WRITE;
+
+
+/* ==========================================
+   RETURN Y BREAK
+   ========================================== */
+
+non terminal SENTENCIA_RETURN;
+non terminal SENTENCIA_BREAK;
+
+
+/* ==========================================
+   SIMBOLO INICIAL
+   ========================================== */
+
+start with PROGRAMA;
+
+
+/* ==========================================
+   1. ESTRUCTURA DEL PROGRAMA
+   ========================================== */
+
+PROGRAMA ::=
+      FUNCION_MAIN
+    ;
+
+PROGRAMA ::=
+      LISTA_ELEMENTOS FUNCION_MAIN
+    ;
+
+
+LISTA_ELEMENTOS ::=
+      ELEMENTO_PROGRAMA
+    ;
+
+LISTA_ELEMENTOS ::=
+      ELEMENTO_PROGRAMA LISTA_ELEMENTOS
+    ;
+
+
+ELEMENTO_PROGRAMA ::=
+      DECLARACION_GLOBAL
+    ;
+
+ELEMENTO_PROGRAMA ::=
+      DECLARACION_FUNCION
+    ;
+
+ELEMENTO_PROGRAMA ::=
+      error FIN_EXPR
+    ;
+
+
+/* ==========================================
+   2. DECLARACIONES GLOBALES
+   ========================================== */
+
+DECLARACION_GLOBAL ::=
+      DECLARACION_VAR_SIMPLE
+    ;
+
+DECLARACION_GLOBAL ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+DECLARACION_GLOBAL ::=
+      ARREGLO
+    ;
+
+
+/* ==========================================
+   3. FUNCION PRINCIPAL
+   ========================================== */
+
+FUNCION_MAIN ::=
+      VOID PRINCIPAL PAR_INI PAR_FIN
+      {: tablaSimbolos.abrirAmbito("principal"); :}
+      BLOQUE_FUNCION
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+
+/* ==========================================
+   4. TIPOS
+   ========================================== */
+
+TIPO_RETORNO ::=
+      INT   {: RESULT = "int"; :}
+    | FLOAT {: RESULT = "float"; :}
+    | CHAR  {: RESULT = "char"; :}
+    | BOOL  {: RESULT = "bool"; :}
+    ;
+
+
+/* ==========================================
+   5. PARAMETROS
+   ========================================== */
+
+PARAMETRO ::=
+      INT ID:id
+      {: tablaSimbolos.agregarSimbolo((String) id, "int", idleft, "parametro"); :}
+    ;
+
+PARAMETRO ::=
+      FLOAT ID:id
+      {: tablaSimbolos.agregarSimbolo((String) id, "float", idleft, "parametro"); :}
+    ;
+
+PARAMETRO ::=
+      BOOL ID:id
+      {: tablaSimbolos.agregarSimbolo((String) id, "bool", idleft, "parametro"); :}
+    ;
+
+PARAMETRO ::=
+      CHAR ID:id
+      {: tablaSimbolos.agregarSimbolo((String) id, "char", idleft, "parametro"); :}
+    ;
+
+PARAMETRO ::=
+      STRING ID:id
+      {: tablaSimbolos.agregarSimbolo((String) id, "string", idleft, "parametro"); :}
+    ;
+
+
+PARAMETROS ::=
+      PARAMETRO
+    ;
+
+PARAMETROS ::=
+      PARAMETRO COMA PARAMETROS
+    ;
+
+
+/* ==========================================
+   6. FUNCIONES
+   ========================================== */
+
+DECLARACION_FUNCION ::=
+      TIPO_RETORNO:tipo ID:id PAR_INI
+      {:
+          tablaSimbolos.agregarSimbolo((String) id, (String) tipo, idleft, "funcion");
+          tablaSimbolos.abrirAmbito("funcion " + id);
+      :}
+      PAR_FIN BLOQUE_FUNCION
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+DECLARACION_FUNCION ::=
+      TIPO_RETORNO:tipo ID:id PAR_INI
+      {:
+          tablaSimbolos.agregarSimbolo((String) id, (String) tipo, idleft, "funcion");
+          tablaSimbolos.abrirAmbito("funcion " + id);
+      :}
+      PARAMETROS PAR_FIN BLOQUE_FUNCION
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+
+/* ==========================================
+   7. ARGUMENTOS
+   ========================================== */
+
+ARGUMENTO ::=
+      EXPRESION
+    ;
+
+
+ARGUMENTOS ::=
+      ARGUMENTO
+    ;
+
+ARGUMENTOS ::=
+      ARGUMENTO COMA ARGUMENTOS
+    ;
+
+
+/* ==========================================
+   8. LLAMADA A FUNCION
+   ========================================== */
+
+LLAMADA_FUNCION ::=
+      ID PAR_INI PAR_FIN
+    ;
+
+LLAMADA_FUNCION ::=
+      ID PAR_INI ARGUMENTOS PAR_FIN
+    ;
+
+
+/* ==========================================
+   9. BLOQUES
+   ========================================== */
+
+BLOQUE ::=
+      BLOQUE_INI {: tablaSimbolos.abrirAmbitoBloque(); :}
+      LISTA_SENTENCIAS BLOQUE_FIN
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+BLOQUE_FUNCION ::=
+      BLOQUE_INI LISTA_SENTENCIAS BLOQUE_FIN
+    ;
+
+
+LISTA_SENTENCIAS ::=
+      /* vacio */
+    ;
+
+LISTA_SENTENCIAS ::=
+      SENTENCIA LISTA_SENTENCIAS
+    ;
+
+
+/* ==========================================
+   10. SENTENCIAS
+   ========================================== */
+
+SENTENCIA ::=
+      DECLARACION_VAR_SIMPLE
+    ;
+
+SENTENCIA ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+SENTENCIA ::=
+      ASIGNACION_VAR
+    ;
+
+SENTENCIA ::=
+      ARREGLO
+    ;
+
+SENTENCIA ::=
+      ASIGNACION_ARREGLO
+    ;
+
+SENTENCIA ::=
+      EXPR_SIN_ASIGNACION
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_RETURN
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_BREAK
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_READ
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_WRITE
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_IF
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_WHILE
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_FOR
+    ;
+
+SENTENCIA ::=
+      BLOQUE
+    ;
+
+
+/* ==========================================
+   RECUPERACION EN MODO PANICO
+   ========================================== */
+
+SENTENCIA ::=
+      error FIN_EXPR
+    ;
+
+
+/* ==========================================
+   11. EXPRESION GENERAL
+   ========================================== */
+
+EXPRESION ::=
+      EXPR_ARITMETICA
+    ;
+
+EXPRESION ::=
+      EXPR_RELACIONAL
+    ;
+
+EXPRESION ::=
+      EXPR_LOGICA
+    ;
+
+EXPRESION ::=
+      EXPR_NEGACION_LOGICA
+    ;
+
+EXPRESION ::=
+      LIT_BOOL
+    ;
+
+EXPRESION ::=
+      LIT_CHAR
+    ;
+
+EXPRESION ::=
+      LIT_STRING
+    ;
+
+
+/* ==========================================
+   12. EXPRESIONES ARITMETICAS
+   ========================================== */
+
+
+/* ---- Operador negativo ---- */
+
+OP_NEG ::=
+      RESTA
+    ;
+
+
+/* ---- Expresion negativa ---- */
+
+EXPR_NEGATIVO ::=
+      OP_NEG LIT_INT
+    ;
+
+EXPR_NEGATIVO ::=
+      OP_NEG LIT_FLOAT
+    ;
+
+
+/* ---- Incremento ---- */
+
+EXPR_INCREMENTO ::=
+      ID INCREMENTO
+    ;
+
+
+/* ---- Decremento ---- */
+
+EXPR_DECREMENTO ::=
+      ID DECREMENTO
+    ;
+
+
+/* ---- Operandos ---- */
+
+OPERANDO ::=
+      ID
+    ;
+
+OPERANDO ::=
+      LIT_INT
+    ;
+
+OPERANDO ::=
+      LIT_FLOAT
+    ;
+
+OPERANDO ::=
+      ACCESO_ARREGLO
+    ;
+
+OPERANDO ::=
+      GRUPO_PARENTESIS
+    ;
+
+OPERANDO ::=
+      EXPR_NEGATIVO
+    ;
+
+OPERANDO ::=
+      EXPR_INCREMENTO
+    ;
+
+OPERANDO ::=
+      EXPR_DECREMENTO
+    ;
+
+OPERANDO ::=
+      LLAMADA_FUNCION
+    ;
+
+
+/* ---- Potencia ---- */
+
+EXPR_POTENCIA ::=
+      OPERANDO
+    ;
+
+EXPR_POTENCIA ::=
+      OPERANDO POTENCIA EXPR_POTENCIA
+    ;
+
+
+/* ---- Suma y resta ---- */
+
+EXPR_SUMA_RESTA ::=
+      EXPR_POTENCIA
+    ;
+
+EXPR_SUMA_RESTA ::=
+      EXPR_SUMA_RESTA SUMA EXPR_POTENCIA
+    ;
+
+EXPR_SUMA_RESTA ::=
+      EXPR_SUMA_RESTA RESTA EXPR_POTENCIA
+    ;
+
+
+/* ---- Multiplicacion y division ---- */
+
+EXPR_MULT_DIV ::=
+      EXPR_SUMA_RESTA
+    ;
+
+EXPR_MULT_DIV ::=
+      EXPR_MULT_DIV MULTIPLICACION EXPR_SUMA_RESTA
+    ;
+
+EXPR_MULT_DIV ::=
+      EXPR_MULT_DIV DIVISION EXPR_SUMA_RESTA
+    ;
+
+EXPR_MULT_DIV ::=
+      EXPR_MULT_DIV DIVISION_ENTERA EXPR_SUMA_RESTA
+    ;
+
+
+/* ---- Modulo ---- */
+
+EXPR_ARITMETICA ::=
+      EXPR_MULT_DIV
+    ;
+
+EXPR_ARITMETICA ::=
+      EXPR_ARITMETICA MODULO EXPR_MULT_DIV
+    ;
+
+
+/* ==========================================
+   13. EXPRESIONES RELACIONALES
+   ========================================== */
+
+/* Operandos relacionales generales */
+
+OPERANDO_RELACIONAL ::=
+      EXPR_ARITMETICA
+    | EXPR_RELACIONAL
+    | EXPR_LOGICA
+    | EXPR_NEGACION_LOGICA
+    | LIT_BOOL
+    | LIT_CHAR
+    ;
+
+/* Menor */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      MENOR
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+/* Menor o igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      MENOR_IGUAL
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+/* Mayor */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      MAYOR
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+/* Mayor o igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      MAYOR_IGUAL
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+/* Igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      IGUAL
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+/* Diferente */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+      DIFERENTE
+      COR_INI OPERANDO_RELACIONAL COR_FIN
+    ;
+
+
+/* ==========================================
+   14. EXPRESIONES LOGICAS
+   ========================================== */
+
+OPERANDO_LOGICO ::=
+      EXPR_ARITMETICA
+    ;
+
+OPERANDO_LOGICO ::=
+      LIT_BOOL
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_RELACIONAL
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_NEGACION_LOGICA
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_LOGICA
+    ;
+
+
+GRUPO_PARENTESIS ::=
+      PAR_INI OPERANDO_LOGICO PAR_FIN
+    ;
+
+
+/* ---- AND ---- */
+
+EXPR_LOGICA ::=
+      GRUPO_PARENTESIS
+      AND
+      GRUPO_PARENTESIS
+    ;
+
+
+/* ---- OR ---- */
+
+EXPR_LOGICA ::=
+      GRUPO_PARENTESIS
+      OR
+      GRUPO_PARENTESIS
+    ;
+
+
+/* ---- NOT ---- */
+
+EXPR_NEGACION_LOGICA ::=
+      NOT GRUPO_PARENTESIS
+    ;
+
+
+/* ==========================================
+   15. VARIABLES Y ASIGNACIONES
+   ========================================== */
+
+DECLARACION_VAR_SIMPLE ::=
+      VAL INT ID:id FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "int", idleft, "variable"); :}
+    | VAL FLOAT ID:id FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "float", idleft, "variable"); :}
+    | VAL BOOL ID:id FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "bool", idleft, "variable"); :}
+    | VAL CHAR ID:id FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "char", idleft, "variable"); :}
+    | VAL STRING ID:id FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "string", idleft, "variable"); :}
+    ;
+
+
+DECLARACION_VAR_ASIGNADA ::=
+      VAL INT ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "int", idleft, "variable"); :}
+    | VAL FLOAT ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "float", idleft, "variable"); :}
+    | VAL BOOL ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "bool", idleft, "variable"); :}
+    | VAL CHAR ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "char", idleft, "variable"); :}
+    | VAL STRING ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "string", idleft, "variable"); :}
+    ;
+
+
+ASIGNACION_VAR ::=
+      ID ASIGNACION EXPRESION FIN_EXPR
+    ;
+
+
+ASIGNACION_VAR_SIN_FIN ::=
+      ID ASIGNACION EXPRESION
+    ;
+
+
+EXPR_SIN_ASIGNACION ::=
+      EXPRESION FIN_EXPR
+    ;
+
+
+/* ==========================================
+   16. ARREGLOS
+   ========================================== */
+
+LISTA_INT ::=
+      LIT_INT
+    ;
+
+LISTA_INT ::=
+      LIT_INT COMA LISTA_INT
+    ;
+
+
+LISTA_FLOAT ::=
+      LIT_FLOAT
+    ;
+
+LISTA_FLOAT ::=
+      LIT_FLOAT COMA LISTA_FLOAT
+    ;
+
+
+TAMANO_ARREGLO ::=
+      LIT_INT
+    ;
+
+
+ARREGLO_INT ::=
+      VAL INT ID:id COR_INI TAMANO_ARREGLO COR_FIN
+      ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "int[]", idleft, "arreglo"); :}
+    ;
+
+ARREGLO_INT ::=
+      VAL INT ID:id COR_INI TAMANO_ARREGLO COR_FIN
+      ASIGNACION BLOQUE_INI LISTA_INT BLOQUE_FIN FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "int[]", idleft, "arreglo"); :}
+    ;
+
+
+ARREGLO_FLOAT ::=
+      VAL FLOAT ID:id COR_INI TAMANO_ARREGLO COR_FIN
+      ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "float[]", idleft, "arreglo"); :}
+    ;
+
+ARREGLO_FLOAT ::=
+      VAL FLOAT ID:id COR_INI TAMANO_ARREGLO COR_FIN
+      ASIGNACION BLOQUE_INI LISTA_FLOAT BLOQUE_FIN FIN_EXPR
+      {: tablaSimbolos.agregarSimbolo((String) id, "float[]", idleft, "arreglo"); :}
+    ;
+
+
+ARREGLO ::=
+      ARREGLO_INT
+    ;
+
+ARREGLO ::=
+      ARREGLO_FLOAT
+    ;
+
+
+/* ==========================================
+   17. ACCESO A ARREGLOS
+   ========================================== */
+
+INDICE ::=
+      EXPR_ARITMETICA
+    ;
+
+
+ACCESO_ARREGLO ::=
+      ID COR_INI INDICE COR_FIN
+    ;
+
+
+/* ==========================================
+   18. ASIGNACION DE ARREGLOS
+   ========================================== */
+
+ASIGNACION_ARREGLO ::=
+      ACCESO_ARREGLO ASIGNACION EXPRESION FIN_EXPR
+    ;
+
+
+/* ==========================================
+   19. ENTRADA
+   ========================================== */
+
+SENTENCIA_READ ::=
+      READ PAR_INI ID PAR_FIN FIN_EXPR
+    ;
+
+
+/* ==========================================
+   20. SALIDA
+   ========================================== */
+
+OPERANDO_WRITE ::=
+      ID
+    | LIT_INT
+    | LIT_FLOAT
+    | LIT_BOOL
+    | LIT_STRING
+    ;
+
+
+SENTENCIA_WRITE ::=
+      WRITE PAR_INI OPERANDO_WRITE PAR_FIN FIN_EXPR
+    ;
+
+
+/* ==========================================
+   21. RETURN Y BREAK
+   ========================================== */
+
+SENTENCIA_RETURN ::=
+      RETURN EXPRESION FIN_EXPR
+    ;
+
+
+SENTENCIA_BREAK ::=
+      BREAK FIN_EXPR
+    ;
+
+
+/* ==========================================
+   22. IF - ELIF - ELSE
+   ========================================== */
+
+SENTENCIA_IF ::=
+      IF PAR_INI EXPRESION PAR_FIN
+      BLOQUE SENTENCIA_IF_RESTO
+    ;
+
+
+SENTENCIA_IF_RESTO ::=
+      /* vacio */
+    | SENTENCIA_ELIF_LISTA
+    | ELSE BLOQUE
+    | SENTENCIA_ELIF_LISTA ELSE BLOQUE
+    ;
+
+
+SENTENCIA_ELIF_LISTA ::=
+      ELIF PAR_INI EXPRESION PAR_FIN BLOQUE
+    ;
+
+SENTENCIA_ELIF_LISTA ::=
+      ELIF PAR_INI EXPRESION PAR_FIN
+      BLOQUE SENTENCIA_ELIF_LISTA
+    ;
+
+
+/* ==========================================
+   23. WHILE
+   ========================================== */
+
+SENTENCIA_WHILE ::=
+      WHILE PAR_INI EXPRESION PAR_FIN BLOQUE
+    ;
+
+
+/* ==========================================
+   24. FOR
+   ========================================== */
+
+SENTENCIA_FOR_INIT ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+SENTENCIA_FOR_INIT ::=
+      ASIGNACION_VAR
+    ;
+
+
+SENTENCIA_FOR_INCREMENTO ::=
+      EXPR_INCREMENTO
+    ;
+
+SENTENCIA_FOR_INCREMENTO ::=
+      EXPR_DECREMENTO
+    ;
+
+SENTENCIA_FOR_INCREMENTO ::=
+      ASIGNACION_VAR_SIN_FIN
+    ;
+
+
+SENTENCIA_FOR ::=
+      FOR PAR_INI SENTENCIA_FOR_INIT
+      EXPRESION FIN_EXPR
+      SENTENCIA_FOR_INCREMENTO PAR_FIN
+      BLOQUE
+    ;

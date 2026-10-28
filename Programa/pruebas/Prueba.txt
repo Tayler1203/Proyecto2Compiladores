@@ -1,0 +1,43 @@
+float func1 є: char x22, char x22 :э ¿:
+    val float numero Ͱ -0.01»
+    return numero»
+:?
+
+bool _func2_ є: bool _b1_, int _i1_ :э ¿:
+    val int temporal Ͱ 2»
+    return»
+:?
+
+void principal є: :э ¿:
+    val int contador Ͱ 1»
+    val float decimal Ͱ 4.5»
+    val bool bandera Ͱ true»
+    val char letra Ͱ 'a'»
+    val int arregloʃ:3:ʅ Ͱ ¿:1,2,3:? »
+
+    if є:є:ʃ:contador:ʅ < ʃ:5:ʅ:э λ є:bandera:э:э ¿:
+        val int local Ͱ 10»
+    :?
+    elif є:Σє:false:э:э ¿:
+        val int local Ͱ 20»
+    :?
+    else ¿:
+        val int local Ͱ 30»
+    :?
+
+    while є:є:ʃ:contador:ʅ < ʃ:10:ʅ:э θ є:Σє:false:э:э:э ¿:
+        contador Ͱ contador + 1»
+    :?
+
+    decimal Ͱ 3.7 pot decimal + 45.6 mod 76»
+    arregloʃ:contador+1:ʅ Ͱ 2»
+    write є: "Hola mundo" :э »
+    read є: contador :э »
+    read є: contador, decimal :э »
+    val char caracterInvalido Ͱ '!!'»
+    val int operadoresInvalidos Ͱ -1--»
+    val int sinIdentificador Ͱ 1»
+    val float Ͱ -0.01»
+    val int sinTerminador Ͱ 3
+    write є: "Fin" :э »
+:?
