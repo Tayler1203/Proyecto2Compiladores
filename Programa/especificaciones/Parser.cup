@@ -26,7 +26,26 @@ parser code {:
                 + ": el identificador '" + nombre
                 + "' ya fue declarado en este ambito.";
 
-            System.err.println(mensaje);
+            erroresSemanticos.add(mensaje);
+        }
+    }
+
+    /**
+     * Comprueba que un identificador exista en un ambito accesible.
+     *
+     * @param nombre Nombre del identificador.
+     * @param linea Linea donde se utiliza.
+     */
+    public void validarIdentificador(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            String mensaje =
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' no ha sido declarado o esta fuera de su ambito.";
+
             erroresSemanticos.add(mensaje);
         }
     }
@@ -588,21 +607,24 @@ EXPR_NEGATIVO ::=
 /* ---- Incremento ---- */
 
 EXPR_INCREMENTO ::=
-      ID INCREMENTO
+      ID:id INCREMENTO
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 
 /* ---- Decremento ---- */
 
 EXPR_DECREMENTO ::=
-      ID DECREMENTO
+      ID:id DECREMENTO
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 
 /* ---- Operandos ---- */
 
 OPERANDO ::=
-      ID
+      ID:id
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 OPERANDO ::=
@@ -830,12 +852,14 @@ DECLARACION_VAR_ASIGNADA ::=
 
 
 ASIGNACION_VAR ::=
-      ID ASIGNACION EXPRESION FIN_EXPR
+      ID:id ASIGNACION EXPRESION FIN_EXPR
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 
 ASIGNACION_VAR_SIN_FIN ::=
-      ID ASIGNACION EXPRESION
+      ID:id ASIGNACION EXPRESION
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 
@@ -878,7 +902,8 @@ INDICE ::=
 
 
 ACCESO_ARREGLO ::=
-      ID COR_INI INDICE COR_FIN
+      ID:id COR_INI INDICE COR_FIN
+      {: validarIdentificador((String) id, idleft); :}
     ;
 
 

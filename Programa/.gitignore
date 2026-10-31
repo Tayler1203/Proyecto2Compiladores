@@ -16,3 +16,9 @@
 # Archivos de backup de editores de texto
 *~
 **/*~
+
+# Carpeta de salida
+salida/
+
+# Carpeta de pruebas
+pruebas/

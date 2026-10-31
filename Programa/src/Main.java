@@ -27,6 +27,7 @@ public class Main {
         String rutaTokens = "salida/tokens.txt";
         String rutaErroresLexicos = "salida/errores_lexicos.txt";
         String rutaErroresSintacticos = "salida/errores_sintacticos.txt";
+        String rutaErroresSemanticos = "salida/errores_semanticos.txt";
         String rutaTablaSimbolos = "salida/tabla_simbolos.txt";
 
         boolean huboErroresLexicos = analizarLexico(
@@ -38,6 +39,7 @@ public class Main {
         boolean huboErroresSintacticos = analizarSintactico(
             rutaEntrada,
             rutaErroresSintacticos,
+            rutaErroresSemanticos,
             rutaTablaSimbolos
         );
 
@@ -111,8 +113,6 @@ public class Main {
 
                     huboErrores = true;
 
-                    System.out.println(error);
-
                     escritorErrores.write(error);
                     escritorErrores.write("\n");
                 }
@@ -140,8 +140,6 @@ public class Main {
                     + " | Linea: " + linea;
 
 
-                System.out.println(salida);
-
                 escritorTokens.write(salida);
                 escritorTokens.write("\n");
             }
@@ -154,16 +152,15 @@ public class Main {
 
                 huboErrores = true;
 
-                System.out.println(error);
-
                 escritorErrores.write(error);
                 escritorErrores.write("\n");
             }
 
 
-            System.out.println();
             System.out.println(
-                "Analisis lexico finalizado."
+                huboErrores
+                    ? "Analisis lexico finalizado con errores."
+                    : "Analisis lexico finalizado con exito."
             );
 
 
@@ -187,16 +184,18 @@ public class Main {
      * Nombre: analizarSintactico
      * Descripcion: Ejecuta el analisis sintactico del archivo de entrada, recopila errores y
      * guarda la tabla de simbolos resultante en un archivo de salida.
-     * Salidas: Genera un archivo de errores sintacticos y un archivo de tabla de simbolos.
+     * Salidas: Genera un archivo de errores sintacticos, errores semanticos y un archivo de tabla de simbolos.
      *
      * @param rutaEntrada Ruta del archivo fuente a analizar.
      * @param rutaErroresSintacticos Ruta del archivo de errores sintacticos.
+     * @param rutaErroresSemanticos Ruta del archivo de errores semanticos.
      * @param rutaTablaSimbolos Ruta del archivo de salida para la tabla de simbolos.
      * @return true si hubo errores sintacticos o si el analisis se interrumpio; false en caso contrario.
      */
     private static boolean analizarSintactico(
         String rutaEntrada,
         String rutaErroresSintacticos,
+        String rutaErroresSemanticos,
         String rutaTablaSimbolos
     ) {
 
@@ -214,11 +213,6 @@ public class Main {
             parser = new Parser(lexer);
             parser.parse();
 
-            System.out.println();
-            System.out.println(
-                "Analisis sintactico finalizado."
-            );
-
         } catch (Exception e) {
 
             analisisInterrumpido = true;
@@ -233,6 +227,12 @@ public class Main {
         boolean huboErrores =
             analisisInterrumpido
             || (parser != null && parser.huboErrorSintactico());
+
+        System.out.println(
+            huboErrores
+                ? "Analisis sintactico finalizado con errores."
+                : "Analisis sintactico finalizado con exito."
+        );
 
         /* Siempre recrea el archivo para no dejar errores viejos. */
         try (
@@ -253,6 +253,40 @@ public class Main {
             System.out.println(
                 "Error al escribir errores sintacticos: "
                 + e.getMessage()
+            );
+        }
+
+        /* Siempre recrea el archivo para no dejar errores viejos. */
+        try (
+            FileWriter escritorErrores = new FileWriter(
+                rutaErroresSemanticos,
+                StandardCharsets.UTF_8
+            )
+        ) {
+
+            if (parser != null) {
+                for (String error : parser.erroresSemanticos) {
+                    escritorErrores.write(error);
+                    escritorErrores.write("\n");
+                }
+            }
+
+        } catch (IOException e) {
+            System.out.println(
+                "Error al escribir errores semanticos: "
+                + e.getMessage()
+            );
+        }
+
+        if (parser != null) {
+            System.out.println(
+                parser.huboErrorSemantico()
+                    ? "Analisis semantico finalizado con errores."
+                    : "Analisis semantico finalizado con exito."
+            );
+        } else {
+            System.out.println(
+                "Analisis semantico no completado."
             );
         }
 
