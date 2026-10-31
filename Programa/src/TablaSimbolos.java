@@ -82,6 +82,26 @@ public final class TablaSimbolos {
     }
 
     /**
+     * Busca un identificador desde el ambito actual
+     * hasta el ambito global.
+     *
+     * @param nombre Nombre del identificador.
+     * @return Simbolo encontrado o null si no existe
+     *         en los ambitos accesibles.
+     */
+    public Simbolo buscarSimbolo(String nombre) {
+        for (Ambito ambito : pilaAmbitos) {
+            for (Simbolo simbolo : ambito.getSimbolos()) {
+                if (simbolo.getNombre().equals(nombre)) {
+                    return simbolo;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Nombre: getAmbitos
      * Descripcion: Devuelve una vista inmodificable de todos los ambitos registrados en la tabla.
      * Salidas: No hay.
