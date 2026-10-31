@@ -50,6 +50,117 @@ parser code {:
         }
     }
 
+    public void validarTipoAsignacion(
+        String nombre,
+        String tipoDeclarado,
+        String tipoExpresion,
+        int linea
+    ) {
+        // Todavia no conocemos el tipo de todas las expresiones.
+        if (tipoExpresion == null) {
+            return;
+        }
+
+        if (!tipoDeclarado.equals(tipoExpresion)) {
+            String mensaje =
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se puede asignar un valor de tipo '"
+                + tipoExpresion
+                + "' a la variable '" + nombre
+                + "' de tipo '" + tipoDeclarado + "'.";
+
+            erroresSemanticos.add(mensaje);
+        }
+    }
+
+    public String validarOperacionAritmetica(
+        String tipoIzquierdo,
+        String tipoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoIzquierdo == null || tipoDerecho == null) {
+            return null;
+        }
+
+        boolean izquierdoNumerico =
+            tipoIzquierdo.equals("int") || tipoIzquierdo.equals("float");
+
+        boolean derechoNumerico =
+            tipoDerecho.equals("int") || tipoDerecho.equals("float");
+
+        boolean tiposValidos;
+
+        switch (operador) {
+            case "//":
+            case "mod":
+            case "pot":
+                tiposValidos =
+                    tipoIzquierdo.equals("int")
+                    && tipoDerecho.equals("int");
+                break;
+
+            default:
+                tiposValidos = izquierdoNumerico && derechoNumerico;
+                break;
+        }
+
+        if (!tiposValidos) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' no admite operandos de tipo '"
+                + tipoIzquierdo + "' y '"
+                + tipoDerecho + "'."
+            );
+            return null;
+        }
+
+        switch (operador) {
+            case "/":
+                return "float";
+
+            case "//":
+            case "mod":
+            case "pot":
+                return "int";
+
+            default:
+                if (tipoIzquierdo.equals("float")
+                    || tipoDerecho.equals("float")) {
+                    return "float";
+                }
+                return "int";
+        }
+    }
+
+    public String validarIncrementoDecremento(
+        String nombre,
+        String operador,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return null;
+        }
+
+        String tipo = simbolo.getTipo();
+
+        if (!tipo.equals("int") && !tipo.equals("float")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' solo puede aplicarse a variables int o float."
+            );
+            return null;
+        }
+
+        return tipo;
+    }
+
     public boolean huboErrorSemantico() {
         return !erroresSemanticos.isEmpty();
     }
@@ -206,18 +317,18 @@ non terminal DECLARACION_VAR_ASIGNADA;
 non terminal ARREGLO;
 
 non terminal ASIGNACION_ARREGLO;
-non terminal ACCESO_ARREGLO;
+non terminal String ACCESO_ARREGLO;
 
 non terminal TAMANO_ARREGLO;
 non terminal LISTA_EXPRESIONES;
-non terminal INDICE;
+non terminal String INDICE;
 
 non terminal ASIGNACION_VAR;
 non terminal ASIGNACION_VAR_SIN_FIN;
 
 non terminal EXPR_SIN_ASIGNACION;
 
-non terminal EXPRESION;
+non terminal String EXPRESION;
 
 
 /* ==========================================
@@ -226,34 +337,34 @@ non terminal EXPRESION;
 
 non terminal OP_NEG;
 
-non terminal EXPR_NEGATIVO;
-non terminal EXPR_INCREMENTO;
-non terminal EXPR_DECREMENTO;
+non terminal String EXPR_NEGATIVO;
+non terminal String EXPR_INCREMENTO;
+non terminal String EXPR_DECREMENTO;
 
-non terminal OPERANDO;
+non terminal String OPERANDO;
 
-non terminal EXPR_POTENCIA;
-non terminal EXPR_SUMA_RESTA;
-non terminal EXPR_MULT_DIV;
-non terminal EXPR_ARITMETICA;
+non terminal String EXPR_POTENCIA;
+non terminal String EXPR_SUMA_RESTA;
+non terminal String EXPR_MULT_DIV;
+non terminal String EXPR_ARITMETICA;
 
 
 /* ==========================================
    EXPRESIONES RELACIONALES
    ========================================== */
 
-non terminal OPERANDO_RELACIONAL;
-non terminal EXPR_RELACIONAL;
+non terminal String OPERANDO_RELACIONAL;
+non terminal String EXPR_RELACIONAL;
 
 
 /* ==========================================
    EXPRESIONES LOGICAS
    ========================================== */
 
-non terminal OPERANDO_LOGICO;
-non terminal EXPR_LOGICA;
-non terminal EXPR_NEGACION_LOGICA;
-non terminal GRUPO_PARENTESIS;
+non terminal String OPERANDO_LOGICO;
+non terminal String EXPR_LOGICA;
+non terminal String EXPR_NEGACION_LOGICA;
+non terminal String GRUPO_PARENTESIS;
 
 
 /* ==========================================
@@ -553,32 +664,60 @@ SENTENCIA ::=
    ========================================== */
 
 EXPRESION ::=
-      EXPR_ARITMETICA
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
     ;
 
 EXPRESION ::=
       EXPR_RELACIONAL
+      {: RESULT = "bool"; :}
     ;
 
 EXPRESION ::=
       EXPR_LOGICA
+      {: RESULT = "bool"; :}
     ;
 
 EXPRESION ::=
       EXPR_NEGACION_LOGICA
+      {: RESULT = "bool"; :}
     ;
 
-EXPRESION ::=
-      LIT_BOOL
-    ;
 
-EXPRESION ::=
-      LIT_CHAR
-    ;
+//Si el profesor NO permite que estos literales sean usados
+// EXPRESION ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
+//
+// EXPRESION ::=
+//       LIT_CHAR
+//       {: RESULT = "char"; :}
+//     ;
+//
+// EXPRESION ::=
+//       LIT_STRING
+//       {: RESULT = "string"; :}
+//     ;
+//
 
-EXPRESION ::=
-      LIT_STRING
-    ;
+// OPERANDO_RELACIONAL ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
+//
+// OPERANDO_RELACIONAL ::=
+//       LIT_CHAR
+//       {: RESULT = "char"; :}
+//     ;
+//
+// NOTA: La siguiente producción se eliminó de OPERANDO_LOGICO
+// para evitar conflictos. Si se necesita, descomentarla:
+//
+// OPERANDO_LOGICO ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
 
 
 /* ==========================================
@@ -597,10 +736,9 @@ OP_NEG ::=
 
 EXPR_NEGATIVO ::=
       OP_NEG LIT_INT
-    ;
-
-EXPR_NEGATIVO ::=
-      OP_NEG LIT_FLOAT
+      {: RESULT = "int"; :}
+    | OP_NEG LIT_FLOAT
+      {: RESULT = "float"; :}
     ;
 
 
@@ -608,7 +746,11 @@ EXPR_NEGATIVO ::=
 
 EXPR_INCREMENTO ::=
       ID:id INCREMENTO
-      {: validarIdentificador((String) id, idleft); :}
+      {:
+          RESULT = validarIncrementoDecremento(
+              (String) id, "++", idleft
+          );
+      :}
     ;
 
 
@@ -616,7 +758,11 @@ EXPR_INCREMENTO ::=
 
 EXPR_DECREMENTO ::=
       ID:id DECREMENTO
-      {: validarIdentificador((String) id, idleft); :}
+      {:
+          RESULT = validarIncrementoDecremento(
+              (String) id, "--", idleft
+          );
+      :}
     ;
 
 
@@ -624,95 +770,132 @@ EXPR_DECREMENTO ::=
 
 OPERANDO ::=
       ID:id
-      {: validarIdentificador((String) id, idleft); :}
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          RESULT = (simbolo != null)
+              ? simbolo.getTipo()
+              : null;
+      :}
+
+    | LIT_INT
+      {: RESULT = "int"; :}
+
+    | LIT_FLOAT
+      {: RESULT = "float"; :}
+
+    // PENDIENTE: Consultar con el profesor si estos literales
+    // deben ser permitidos en operandos aritméticos
+    | LIT_BOOL
+      {: RESULT = "bool"; :}
+
+    | LIT_STRING
+      {: RESULT = "string"; :}
+
+    | LIT_CHAR
+      {: RESULT = "char"; :}
+
+    | ACCESO_ARREGLO:aa
+      {: RESULT = aa; :}
+
+    | GRUPO_PARENTESIS:gp
+      {: RESULT = gp; :}
+
+    | EXPR_NEGATIVO:en
+      {: RESULT = en; :}
+
+    | EXPR_INCREMENTO:ei
+      {: RESULT = ei; :}
+
+    | EXPR_DECREMENTO:ed
+      {: RESULT = ed; :}
+
+    | LLAMADA_FUNCION
+      {: RESULT = null; :}
     ;
 
-OPERANDO ::=
-      LIT_INT
-    ;
 
-OPERANDO ::=
-      LIT_FLOAT
-    ;
-
-OPERANDO ::=
-      ACCESO_ARREGLO
-    ;
-
-OPERANDO ::=
-      GRUPO_PARENTESIS
-    ;
-
-OPERANDO ::=
-      EXPR_NEGATIVO
-    ;
-
-OPERANDO ::=
-      EXPR_INCREMENTO
-    ;
-
-OPERANDO ::=
-      EXPR_DECREMENTO
-    ;
-
-OPERANDO ::=
-      LLAMADA_FUNCION
-    ;
-
-
-/* ---- Potencia ---- */
+/* ---- Potencia: mayor precedencia ---- */
 
 EXPR_POTENCIA ::=
-      OPERANDO
-    ;
+      OPERANDO:op
+      {: RESULT = op; :}
 
-EXPR_POTENCIA ::=
-      OPERANDO POTENCIA EXPR_POTENCIA
+    | OPERANDO:izq POTENCIA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "pot", izqleft
+          );
+      :}
     ;
 
 
 /* ---- Suma y resta ---- */
 
 EXPR_SUMA_RESTA ::=
-      EXPR_POTENCIA
-    ;
+      EXPR_POTENCIA:ep
+      {: RESULT = ep; :}
 
-EXPR_SUMA_RESTA ::=
-      EXPR_SUMA_RESTA SUMA EXPR_POTENCIA
-    ;
+    | EXPR_SUMA_RESTA:izq SUMA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "+", izqleft
+          );
+      :}
 
-EXPR_SUMA_RESTA ::=
-      EXPR_SUMA_RESTA RESTA EXPR_POTENCIA
+    | EXPR_SUMA_RESTA:izq RESTA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "-", izqleft
+          );
+      :}
     ;
 
 
 /* ---- Multiplicacion y division ---- */
 
 EXPR_MULT_DIV ::=
-      EXPR_SUMA_RESTA
+      EXPR_SUMA_RESTA:esr
+      {: RESULT = esr; :}
+
+    | EXPR_MULT_DIV:izq MULTIPLICACION EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "*", izqleft
+          );
+      :}
+
+    | EXPR_MULT_DIV:izq DIVISION EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "/", izqleft
+          );
+      :}
+
+    | EXPR_MULT_DIV:izq DIVISION_ENTERA EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "//", izqleft
+          );
+      :}
     ;
 
-EXPR_MULT_DIV ::=
-      EXPR_MULT_DIV MULTIPLICACION EXPR_SUMA_RESTA
-    ;
 
-EXPR_MULT_DIV ::=
-      EXPR_MULT_DIV DIVISION EXPR_SUMA_RESTA
-    ;
-
-EXPR_MULT_DIV ::=
-      EXPR_MULT_DIV DIVISION_ENTERA EXPR_SUMA_RESTA
-    ;
-
-
-/* ---- Modulo ---- */
+/* ---- Modulo: menor precedencia ---- */
 
 EXPR_ARITMETICA ::=
-      EXPR_MULT_DIV
-    ;
+      EXPR_MULT_DIV:emd
+      {: RESULT = emd; :}
 
-EXPR_ARITMETICA ::=
-      EXPR_ARITMETICA MODULO EXPR_MULT_DIV
+    | EXPR_ARITMETICA:izq MODULO EXPR_MULT_DIV:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "mod", izqleft
+          );
+      :}
     ;
 
 
@@ -723,12 +906,23 @@ EXPR_ARITMETICA ::=
 /* Operandos relacionales generales */
 
 OPERANDO_RELACIONAL ::=
-      EXPR_ARITMETICA
-    | EXPR_RELACIONAL
-    | EXPR_LOGICA
-    | EXPR_NEGACION_LOGICA
-    | LIT_BOOL
-    | LIT_CHAR
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_RELACIONAL
+      {: RESULT = "bool"; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_LOGICA
+      {: RESULT = "bool"; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
     ;
 
 /* Menor */
@@ -785,28 +979,29 @@ EXPR_RELACIONAL ::=
    ========================================== */
 
 OPERANDO_LOGICO ::=
-      EXPR_ARITMETICA
-    ;
-
-OPERANDO_LOGICO ::=
-      LIT_BOOL
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
     ;
 
 OPERANDO_LOGICO ::=
       EXPR_RELACIONAL
+      {: RESULT = "bool"; :}
     ;
 
 OPERANDO_LOGICO ::=
-      EXPR_NEGACION_LOGICA
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
     ;
 
 OPERANDO_LOGICO ::=
-      EXPR_LOGICA
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
     ;
 
 
 GRUPO_PARENTESIS ::=
-      PAR_INI OPERANDO_LOGICO PAR_FIN
+      PAR_INI OPERANDO_LOGICO:ol PAR_FIN
+      {: RESULT = ol; :}
     ;
 
 
@@ -831,7 +1026,8 @@ EXPR_LOGICA ::=
 /* ---- NOT ---- */
 
 EXPR_NEGACION_LOGICA ::=
-      NOT GRUPO_PARENTESIS
+      NOT GRUPO_PARENTESIS:gp
+      {: RESULT = gp; :}
     ;
 
 
@@ -846,8 +1042,11 @@ DECLARACION_VAR_SIMPLE ::=
 
 
 DECLARACION_VAR_ASIGNADA ::=
-      VAL TIPO:tipo ID:id ASIGNACION EXPRESION FIN_EXPR
-      {: registrarSimbolo((String) id, tipo, idleft, "variable"); :}
+      VAL TIPO:tipo ID:id ASIGNACION EXPRESION:expr FIN_EXPR
+      {:
+          registrarSimbolo((String) id, tipo, idleft, "variable");
+          validarTipoAsignacion((String) id, tipo, expr, idleft);
+      :}
     ;
 
 
@@ -897,13 +1096,28 @@ ARREGLO ::=
    ========================================== */
 
 INDICE ::=
-      EXPR_ARITMETICA
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
     ;
 
 
 ACCESO_ARREGLO ::=
       ID:id COR_INI INDICE COR_FIN
-      {: validarIdentificador((String) id, idleft); :}
+      {:
+          validarIdentificador((String) id, idleft);
+          TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarSimbolo((String) id);
+          if (simbolo != null) {
+              String tipo = simbolo.getTipo();
+              // Eliminar los corchetes del tipo de arreglo
+              if (tipo.endsWith("[]")) {
+                  RESULT = tipo.substring(0, tipo.length() - 2);
+              } else {
+                  RESULT = tipo;
+              }
+          } else {
+              RESULT = null;
+          }
+      :}
     ;
 
 
