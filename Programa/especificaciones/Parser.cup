@@ -1051,14 +1051,42 @@ DECLARACION_VAR_ASIGNADA ::=
 
 
 ASIGNACION_VAR ::=
-      ID:id ASIGNACION EXPRESION FIN_EXPR
-      {: validarIdentificador((String) id, idleft); :}
+      ID:id ASIGNACION EXPRESION:expr FIN_EXPR
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          if (simbolo != null) {
+              validarTipoAsignacion(
+                  (String) id,
+                  simbolo.getTipo(),
+                  expr,
+                  idleft
+              );
+          }
+      :}
     ;
 
 
 ASIGNACION_VAR_SIN_FIN ::=
-      ID:id ASIGNACION EXPRESION
-      {: validarIdentificador((String) id, idleft); :}
+      ID:id ASIGNACION EXPRESION:expr
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          if (simbolo != null) {
+              validarTipoAsignacion(
+                  (String) id,
+                  simbolo.getTipo(),
+                  expr,
+                  idleft
+              );
+          }
+      :}
     ;
 
 
