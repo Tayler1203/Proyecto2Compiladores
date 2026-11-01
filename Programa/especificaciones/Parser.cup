@@ -56,7 +56,6 @@ parser code {:
         String tipoExpresion,
         int linea
     ) {
-        // Todavia no conocemos el tipo de todas las expresiones.
         if (tipoExpresion == null) {
             return;
         }
@@ -74,44 +73,52 @@ parser code {:
     }
 
     public String validarOperacionAritmetica(
-        String tipoIzquierdo,
-        String tipoDerecho,
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
         String operador,
         int linea
     ) {
-        if (tipoIzquierdo == null || tipoDerecho == null) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
             return null;
         }
 
-        boolean izquierdoNumerico =
-            tipoIzquierdo.equals("int") || tipoIzquierdo.equals("float");
+        boolean izquierdoEsNumerico =
+            tipoOperandoIzquierdo.equals("int")
+            || tipoOperandoIzquierdo.equals("float");
 
-        boolean derechoNumerico =
-            tipoDerecho.equals("int") || tipoDerecho.equals("float");
+        boolean derechoEsNumerico =
+            tipoOperandoDerecho.equals("int") || tipoOperandoDerecho.equals("float");
 
-        boolean tiposValidos;
+        boolean tiposSonValidos;
 
         switch (operador) {
             case "//":
             case "mod":
             case "pot":
-                tiposValidos =
-                    tipoIzquierdo.equals("int")
-                    && tipoDerecho.equals("int");
+                tiposSonValidos =
+                    tipoOperandoIzquierdo.equals("int")
+                    && tipoOperandoDerecho.equals("int");
+                break;
+
+            case "+":
+            case "-":
+            case "*":
+            case "/":
+                tiposSonValidos = izquierdoEsNumerico && derechoEsNumerico;
                 break;
 
             default:
-                tiposValidos = izquierdoNumerico && derechoNumerico;
+                tiposSonValidos = false;
                 break;
         }
 
-        if (!tiposValidos) {
+        if (!tiposSonValidos) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": el operador '" + operador
                 + "' no admite operandos de tipo '"
-                + tipoIzquierdo + "' y '"
-                + tipoDerecho + "'."
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
             );
             return null;
         }
@@ -125,13 +132,72 @@ parser code {:
             case "pot":
                 return "int";
 
-            default:
-                if (tipoIzquierdo.equals("float")
-                    || tipoDerecho.equals("float")) {
+            case "+":
+            case "-":
+            case "*":
+                if (tipoOperandoIzquierdo.equals("float")
+                    || tipoOperandoDerecho.equals("float")) {
                     return "float";
                 }
                 return "int";
+
+            default:
+                return null;
         }
+    }
+
+    public String validarOperacionRelacional(
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
+            return null;
+        }
+
+        boolean izquierdoEsNumerico =
+            tipoOperandoIzquierdo.equals("int") || tipoOperandoIzquierdo.equals("float");
+
+        boolean derechoEsNumerico =
+            tipoOperandoDerecho.equals("int") || tipoOperandoDerecho.equals("float");
+
+        boolean tiposSonValidos;
+
+        switch (operador) {
+            case "<":
+            case "<=":
+            case ">":
+            case ">=":
+                tiposSonValidos = izquierdoEsNumerico && derechoEsNumerico;
+                break;
+
+            case "==":
+            case "!=":
+                tiposSonValidos =
+                    (izquierdoEsNumerico && derechoEsNumerico)
+                    || (tipoOperandoIzquierdo.equals("bool")
+                        && tipoOperandoDerecho.equals("bool"))
+                    || (tipoOperandoIzquierdo.equals("char")
+                        && tipoOperandoDerecho.equals("char"));
+                break;
+
+            default:
+                return null;
+        }
+
+        if (!tiposSonValidos) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' no admite operandos de tipo '"
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
+            );
+            return null;
+        }
+
+        return "bool";
     }
 
     public String validarIncrementoDecremento(
@@ -911,8 +977,8 @@ OPERANDO_RELACIONAL ::=
     ;
 
 OPERANDO_RELACIONAL ::=
-      EXPR_RELACIONAL
-      {: RESULT = "bool"; :}
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
     ;
 
 OPERANDO_RELACIONAL ::=
@@ -928,49 +994,79 @@ OPERANDO_RELACIONAL ::=
 /* Menor */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       MENOR
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "<", izqleft
+          );
+      :}
     ;
 
 /* Menor o igual */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       MENOR_IGUAL
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "<=", izqleft
+          );
+      :}
     ;
 
 /* Mayor */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       MAYOR
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, ">", izqleft
+          );
+      :}
     ;
 
 /* Mayor o igual */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       MAYOR_IGUAL
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, ">=", izqleft
+          );
+      :}
     ;
 
 /* Igual */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       IGUAL
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "==", izqleft
+          );
+      :}
     ;
 
 /* Diferente */
 
 EXPR_RELACIONAL ::=
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
       DIFERENTE
-      COR_INI OPERANDO_RELACIONAL COR_FIN
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "!=", izqleft
+          );
+      :}
     ;
 
 
