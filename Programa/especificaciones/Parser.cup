@@ -10,6 +10,9 @@ parser code {:
 
     public List<String> erroresSemanticos = new ArrayList<>();
 
+    private String tipoRetornoActual = null;
+    private String nombreFuncionActual = null;
+
     public void registrarSimbolo(
         String nombre,
         String tipo,
@@ -47,6 +50,107 @@ parser code {:
                 + "' no ha sido declarado o esta fuera de su ambito.";
 
             erroresSemanticos.add(mensaje);
+        }
+    }
+
+    public void validarRead(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return;
+        }
+
+        if (!"variable".equals(simbolo.getCategoria())
+            && !"parametro".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": read requiere una variable, pero '"
+                + nombre + "' no es una variable."
+            );
+            return;
+        }
+
+        String tipo = simbolo.getTipo();
+
+        if (!tipo.equals("int")
+            && !tipo.equals("float")
+            && !tipo.equals("char")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": read solo admite variables int, float o char; '"
+                + nombre + "' es de tipo '" + tipo + "'."
+            );
+        }
+    }
+
+    public void validarWriteIdentificador(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return;
+        }
+
+        if (!"variable".equals(simbolo.getCategoria())
+            && !"parametro".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": write requiere un literal o una variable, pero '"
+                + nombre + "' no es una variable."
+            );
+            return;
+        }
+
+        validarWriteTipo(simbolo.getTipo(), linea);
+    }
+
+    public void validarWriteTipo(String tipo, int linea) {
+        if (tipo == null) {
+            return;
+        }
+
+        if (!tipo.equals("int")
+            && !tipo.equals("float")
+            && !tipo.equals("bool")
+            && !tipo.equals("string")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": write no admite valores de tipo '" + tipo + "'."
+            );
+        }
+    }
+
+    public void validarReturn(String tipoExpresion, int linea) {
+        if (tipoRetornoActual == null) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": return se encuentra fuera de una funcion."
+            );
+            return;
+        }
+
+        if (tipoRetornoActual.equals("void")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion 'principal' es void y no puede retornar un valor."
+            );
+            return;
+        }
+
+        if (tipoExpresion == null) {
+            return;
+        }
+
+        if (!tipoRetornoActual.equals(tipoExpresion)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombreFuncionActual
+                + "' debe retornar '" + tipoRetornoActual
+                + "', pero se encontro '" + tipoExpresion + "'."
+            );
         }
     }
 
@@ -658,9 +762,17 @@ DECLARACION_GLOBAL ::=
 
 FUNCION_MAIN ::=
       VOID PRINCIPAL PAR_INI PAR_FIN
-      {: tablaSimbolos.abrirAmbito("principal"); :}
+      {:
+          tipoRetornoActual = "void";
+          nombreFuncionActual = "principal";
+          tablaSimbolos.abrirAmbito("principal");
+      :}
       BLOQUE_FUNCION
-      {: tablaSimbolos.cerrarAmbito(); :}
+      {:
+          tablaSimbolos.cerrarAmbito();
+          tipoRetornoActual = null;
+          nombreFuncionActual = null;
+      :}
     ;
 
 
@@ -729,6 +841,8 @@ DECLARACION_FUNCION ::=
           registrarSimbolo(
               (String) id, tipo, idleft, "funcion"
           );
+          tipoRetornoActual = tipo;
+          nombreFuncionActual = (String) id;
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
       PAR_FIN
@@ -742,6 +856,8 @@ DECLARACION_FUNCION ::=
       BLOQUE_FUNCION
       {:
           tablaSimbolos.cerrarAmbito();
+          tipoRetornoActual = null;
+          nombreFuncionActual = null;
       :}
     ;
 
@@ -751,6 +867,8 @@ DECLARACION_FUNCION ::=
           registrarSimbolo(
               (String) id, tipo, idleft, "funcion"
           );
+          tipoRetornoActual = tipo;
+          nombreFuncionActual = (String) id;
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
       PARAMETROS:tipos PAR_FIN
@@ -762,6 +880,8 @@ DECLARACION_FUNCION ::=
       BLOQUE_FUNCION
       {:
           tablaSimbolos.cerrarAmbito();
+          tipoRetornoActual = null;
+          nombreFuncionActual = null;
       :}
     ;
 
@@ -1455,7 +1575,10 @@ ASIGNACION_ARREGLO ::=
    ========================================== */
 
 SENTENCIA_READ ::=
-      READ PAR_INI ID PAR_FIN FIN_EXPR
+      READ PAR_INI ID:id PAR_FIN FIN_EXPR
+      {:
+          validarRead((String) id, idleft);
+      :}
     ;
 
 
@@ -1464,7 +1587,10 @@ SENTENCIA_READ ::=
    ========================================== */
 
 OPERANDO_WRITE ::=
-      ID
+      ID:id
+      {:
+          validarWriteIdentificador((String) id, idleft);
+      :}
     | LIT_INT
     | LIT_FLOAT
     | LIT_BOOL
@@ -1482,7 +1608,10 @@ SENTENCIA_WRITE ::=
    ========================================== */
 
 SENTENCIA_RETURN ::=
-      RETURN EXPRESION FIN_EXPR
+      RETURN:r EXPRESION:tipo FIN_EXPR
+      {:
+          validarReturn(tipo, rleft);
+      :}
     ;
 
 
