@@ -200,6 +200,51 @@ parser code {:
         return "bool";
     }
 
+    public String validarOperacionLogica(
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
+            return null;
+        }
+
+        if (!tipoOperandoIzquierdo.equals("bool")
+            || !tipoOperandoDerecho.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' solo admite operandos de tipo 'bool', pero recibio '"
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
+            );
+            return null;
+        }
+
+        return "bool";
+    }
+
+    public String validarNegacionLogica(
+        String tipoOperando,
+        int linea
+    ) {
+        if (tipoOperando == null) {
+            return null;
+        }
+
+        if (!tipoOperando.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador 'Σ' solo admite operandos de tipo 'bool', pero recibio '"
+                + tipoOperando + "'."
+            );
+            return null;
+        }
+
+        return "bool";
+    }
+
     public String validarIncrementoDecremento(
         String nombre,
         String operador,
@@ -1080,8 +1125,8 @@ OPERANDO_LOGICO ::=
     ;
 
 OPERANDO_LOGICO ::=
-      EXPR_RELACIONAL
-      {: RESULT = "bool"; :}
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
     ;
 
 OPERANDO_LOGICO ::=
@@ -1104,18 +1149,28 @@ GRUPO_PARENTESIS ::=
 /* ---- AND ---- */
 
 EXPR_LOGICA ::=
-      GRUPO_PARENTESIS
+      GRUPO_PARENTESIS:izq
       AND
-      GRUPO_PARENTESIS
+      GRUPO_PARENTESIS:der
+      {:
+          RESULT = validarOperacionLogica(
+              izq, der, "λ", izqleft
+          );
+      :}
     ;
 
 
 /* ---- OR ---- */
 
 EXPR_LOGICA ::=
-      GRUPO_PARENTESIS
+      GRUPO_PARENTESIS:izq
       OR
-      GRUPO_PARENTESIS
+      GRUPO_PARENTESIS:der
+      {:
+          RESULT = validarOperacionLogica(
+              izq, der, "θ", izqleft
+          );
+      :}
     ;
 
 
@@ -1123,7 +1178,11 @@ EXPR_LOGICA ::=
 
 EXPR_NEGACION_LOGICA ::=
       NOT GRUPO_PARENTESIS:gp
-      {: RESULT = gp; :}
+      {:
+          RESULT = validarNegacionLogica(
+              gp, gpleft
+          );
+      :}
     ;
 
 
