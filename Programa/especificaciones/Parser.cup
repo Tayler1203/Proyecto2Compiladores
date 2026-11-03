@@ -245,6 +245,25 @@ parser code {:
         return "bool";
     }
 
+    public void validarCondicion(
+        String tipoCondicion,
+        String estructura,
+        int linea
+    ) {
+        if (tipoCondicion == null) {
+            return;
+        }
+
+        if (!tipoCondicion.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la condicion de '" + estructura
+                + "' debe ser de tipo 'bool', pero se obtuvo '"
+                + tipoCondicion + "'."
+            );
+        }
+    }
+
     public String validarIncrementoDecremento(
         String nombre,
         String operador,
@@ -780,18 +799,18 @@ EXPRESION ::=
     ;
 
 EXPRESION ::=
-      EXPR_RELACIONAL
-      {: RESULT = "bool"; :}
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
     ;
 
 EXPRESION ::=
-      EXPR_LOGICA
-      {: RESULT = "bool"; :}
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
     ;
 
 EXPRESION ::=
-      EXPR_NEGACION_LOGICA
-      {: RESULT = "bool"; :}
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
     ;
 
 
@@ -1359,8 +1378,11 @@ SENTENCIA_BREAK ::=
    ========================================== */
 
 SENTENCIA_IF ::=
-      IF PAR_INI EXPRESION PAR_FIN
+      IF PAR_INI EXPRESION:cond PAR_FIN
       BLOQUE SENTENCIA_IF_RESTO
+      {:
+          validarCondicion(cond, "if", condleft);
+      :}
     ;
 
 
@@ -1373,12 +1395,19 @@ SENTENCIA_IF_RESTO ::=
 
 
 SENTENCIA_ELIF_LISTA ::=
-      ELIF PAR_INI EXPRESION PAR_FIN BLOQUE
+      ELIF PAR_INI EXPRESION:cond PAR_FIN BLOQUE
+      {:
+          validarCondicion(cond, "elif", condleft);
+      :}
     ;
 
+
 SENTENCIA_ELIF_LISTA ::=
-      ELIF PAR_INI EXPRESION PAR_FIN
+      ELIF PAR_INI EXPRESION:cond PAR_FIN
       BLOQUE SENTENCIA_ELIF_LISTA
+      {:
+          validarCondicion(cond, "elif", condleft);
+      :}
     ;
 
 
@@ -1387,7 +1416,10 @@ SENTENCIA_ELIF_LISTA ::=
    ========================================== */
 
 SENTENCIA_WHILE ::=
-      WHILE PAR_INI EXPRESION PAR_FIN BLOQUE
+      WHILE PAR_INI EXPRESION:cond PAR_FIN BLOQUE
+      {:
+          validarCondicion(cond, "while", condleft);
+      :}
     ;
 
 
@@ -1419,7 +1451,10 @@ SENTENCIA_FOR_INCREMENTO ::=
 
 SENTENCIA_FOR ::=
       FOR PAR_INI SENTENCIA_FOR_INIT
-      EXPRESION FIN_EXPR
+      EXPRESION:cond FIN_EXPR
       SENTENCIA_FOR_INCREMENTO PAR_FIN
       BLOQUE
+      {:
+          validarCondicion(cond, "for", condleft);
+      :}
     ;
