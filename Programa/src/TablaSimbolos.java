@@ -112,6 +112,27 @@ public final class TablaSimbolos {
         return Collections.unmodifiableList(new ArrayList<>(ambitos));
     }
 
+    /**
+     * Registra la firma de parametros de una funcion declarada en el ambito global.
+     *
+     * @param nombre Nombre de la funcion.
+     * @param tiposParametros Tipos de sus parametros, en orden.
+     * @return true si se encontro una funcion y se registro su firma.
+     */
+    public boolean registrarParametrosFuncion(String nombre, List<String> tiposParametros) {
+        if (tiposParametros == null) {
+            return false;
+        }
+
+        for (Simbolo simbolo : ambitos.get(0).getSimbolos()) {
+            if (simbolo.getNombre().equals(nombre)
+                && "funcion".equals(simbolo.getCategoria())) {
+                return simbolo.setTiposParametros(tiposParametros);
+            }
+        }
+        return false;
+    }
+
     public static final class Ambito {
         private final String nombre;
         private final String ruta;
@@ -203,6 +224,8 @@ public final class TablaSimbolos {
         private final String tipo;
         private final int linea;
         private final String categoria;
+        private List<String> tiposParametros = new ArrayList<>();
+        private boolean parametrosRegistrados;
 
         /**
          * Nombre: Simbolo
@@ -264,5 +287,41 @@ public final class TablaSimbolos {
         public String getCategoria() {
             return categoria;
         }
+
+        /**
+         * Obtiene los tipos de los parametros declarados, en orden.
+         *
+         * @return Lista inmodificable de tipos de parametros.
+         */
+        public List<String> getTiposParametros() {
+            return Collections.unmodifiableList(tiposParametros);
+        }
+
+        /**
+         * Obtiene la cantidad de parametros declarados.
+         *
+         * @return Cantidad de parametros.
+         */
+        public int getCantidadParametros() {
+            return tiposParametros.size();
+        }
+
+        /**
+         * Actualiza los tipos de parametros de una funcion.
+         * Solo puede invocarse desde la clase contenedora.
+         *
+         * @param tiposParametros Tipos de los parametros, en orden.
+         * @return true si se registraron exitosamente; false si ya estaban registrados.
+         */
+        private boolean setTiposParametros(List<String> tiposParametros) {
+            if (parametrosRegistrados) {
+                return false;
+            }
+
+            this.tiposParametros = new ArrayList<>(tiposParametros);
+            parametrosRegistrados = true;
+            return true;
+        }
+
     }
 }
