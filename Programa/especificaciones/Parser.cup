@@ -285,36 +285,47 @@ parser code {:
 
     public String validarLlamadaFuncion(
         String nombre,
-        int cantidadArgumentos,
+        List<String> tiposArgumentos,
         int linea
     ) {
-        TablaSimbolos.Simbolo simbolo =
-            tablaSimbolos.buscarSimbolo(nombre);
+        TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarSimbolo(nombre);
 
-        if (simbolo == null
-            || !simbolo.getCategoria().equals("funcion")) {
+        if (simbolo == null || !"funcion".equals(simbolo.getCategoria())) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
-                + ": la funcion '" + nombre
-                + "' no ha sido declarada."
+                + ": la funcion '" + nombre + "' no ha sido declarada."
             );
             return null;
         }
 
-        int cantidadEsperada = simbolo.getCantidadParametros();
-
-        if (cantidadEsperada != cantidadArgumentos) {
+        List<String> tiposEsperados = simbolo.getTiposParametros();
+        if (tiposEsperados.size() != tiposArgumentos.size()) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
-                + ": la funcion '" + nombre
-                + "' espera " + cantidadEsperada
-                + " argumento(s), pero recibio "
-                + cantidadArgumentos + "."
+                + ": la funcion '" + nombre + "' espera " + tiposEsperados.size()
+                + " argumento(s), pero recibio " + tiposArgumentos.size() + "."
             );
             return null;
         }
 
-        return simbolo.getTipo();
+        boolean hayError = false;
+        for (int i = 0; i < tiposEsperados.size(); i++) {
+            String recibido = tiposArgumentos.get(i);
+            String esperado = tiposEsperados.get(i);
+            if (recibido == null) {
+                hayError = true; // Error previo en la expresion: no duplicar mensajes.
+            } else if (!esperado.equals(recibido)) {
+                erroresSemanticos.add(
+                    "[ERROR SEMANTICO] Linea " + linea
+                    + ": el argumento " + (i + 1) + " de la funcion '" + nombre
+                    + "' debe ser de tipo '" + esperado
+                    + "', pero se recibio '" + recibido + "'."
+                );
+                hayError = true;
+            }
+        }
+
+        return hayError ? null : simbolo.getTipo();
     }
 
     public String validarIncrementoDecremento(
@@ -483,8 +494,8 @@ non terminal String TIPO;
 non terminal List PARAMETROS;
 non terminal String PARAMETRO;
 
-non terminal Integer ARGUMENTOS;
-non terminal ARGUMENTO;
+non terminal List ARGUMENTOS;
+non terminal String ARGUMENTO;
 
 non terminal String LLAMADA_FUNCION;
 
@@ -759,22 +770,24 @@ DECLARACION_FUNCION ::=
    7. ARGUMENTOS
    ========================================== */
 
-ARGUMENTO ::=
-      EXPRESION
+ARGUMENTO ::= EXPRESION:tipo
+      {: RESULT = tipo; :}
     ;
 
-
-ARGUMENTOS ::=
-      ARGUMENTO
+ARGUMENTOS ::= ARGUMENTO:tipo
       {:
-          RESULT = 1;
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          RESULT = tipos;
       :}
     ;
 
-ARGUMENTOS ::=
-      ARGUMENTO COMA ARGUMENTOS:resto
+ARGUMENTOS ::= ARGUMENTO:tipo COMA ARGUMENTOS:resto
       {:
-          RESULT = 1 + resto;
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          tipos.addAll(resto);
+          RESULT = tipos;
       :}
     ;
 
@@ -783,20 +796,18 @@ ARGUMENTOS ::=
    8. LLAMADA A FUNCION
    ========================================== */
 
-LLAMADA_FUNCION ::=
-      ID:id PAR_INI PAR_FIN
+LLAMADA_FUNCION ::= ID:id PAR_INI PAR_FIN
       {:
           RESULT = validarLlamadaFuncion(
-              (String) id, 0, idleft
+              (String) id, new ArrayList<String>(), idleft
           );
       :}
     ;
 
-LLAMADA_FUNCION ::=
-      ID:id PAR_INI ARGUMENTOS:cantidad PAR_FIN
+LLAMADA_FUNCION ::= ID:id PAR_INI ARGUMENTOS:tipos PAR_FIN
       {:
           RESULT = validarLlamadaFuncion(
-              (String) id, cantidad, idleft
+              (String) id, tipos, idleft
           );
       :}
     ;
