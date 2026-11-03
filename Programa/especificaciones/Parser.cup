@@ -12,6 +12,7 @@ parser code {:
 
     private String tipoRetornoActual = null;
     private String nombreFuncionActual = null;
+    private int profundidadCiclos = 0;
 
     public void registrarSimbolo(
         String nombre,
@@ -119,6 +120,15 @@ parser code {:
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": write no admite valores de tipo '" + tipo + "'."
+            );
+        }
+    }
+
+    public void validarBreak(int linea) {
+        if (profundidadCiclos == 0) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": break solo puede utilizarse dentro de un ciclo."
             );
         }
     }
@@ -1616,7 +1626,10 @@ SENTENCIA_RETURN ::=
 
 
 SENTENCIA_BREAK ::=
-      BREAK FIN_EXPR
+      BREAK:b FIN_EXPR
+      {:
+          validarBreak(bleft);
+      :}
     ;
 
 
@@ -1663,8 +1676,13 @@ SENTENCIA_ELIF_LISTA ::=
    ========================================== */
 
 SENTENCIA_WHILE ::=
-      WHILE PAR_INI EXPRESION:cond PAR_FIN BLOQUE
+      WHILE PAR_INI EXPRESION:cond PAR_FIN
       {:
+          profundidadCiclos++;
+      :}
+      BLOQUE
+      {:
+          profundidadCiclos--;
           validarCondicion(cond, "while", condleft);
       :}
     ;
@@ -1700,8 +1718,12 @@ SENTENCIA_FOR ::=
       FOR PAR_INI SENTENCIA_FOR_INIT
       EXPRESION:cond FIN_EXPR
       SENTENCIA_FOR_INCREMENTO PAR_FIN
+      {:
+          profundidadCiclos++;
+      :}
       BLOQUE
       {:
+          profundidadCiclos--;
           validarCondicion(cond, "for", condleft);
       :}
     ;
