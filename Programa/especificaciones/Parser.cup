@@ -264,6 +264,59 @@ parser code {:
         }
     }
 
+    public void registrarFirmaFuncion(
+        String nombre,
+        List<String> tiposParametros,
+        int linea
+    ) {
+        boolean registrada =
+            tablaSimbolos.registrarParametrosFuncion(
+                nombre, tiposParametros
+            );
+
+        if (!registrada) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se pudo registrar la firma de la funcion '"
+                + nombre + "'."
+            );
+        }
+    }
+
+    public String validarLlamadaFuncion(
+        String nombre,
+        int cantidadArgumentos,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null
+            || !simbolo.getCategoria().equals("funcion")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre
+                + "' no ha sido declarada."
+            );
+            return null;
+        }
+
+        int cantidadEsperada = simbolo.getCantidadParametros();
+
+        if (cantidadEsperada != cantidadArgumentos) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre
+                + "' espera " + cantidadEsperada
+                + " argumento(s), pero recibio "
+                + cantidadArgumentos + "."
+            );
+            return null;
+        }
+
+        return simbolo.getTipo();
+    }
+
     public String validarIncrementoDecremento(
         String nombre,
         String operador,
@@ -427,13 +480,13 @@ non terminal DECLARACION_FUNCION;
 non terminal String TIPO_RETORNO;
 non terminal String TIPO;
 
-non terminal PARAMETROS;
-non terminal PARAMETRO;
+non terminal List PARAMETROS;
+non terminal String PARAMETRO;
 
-non terminal ARGUMENTOS;
+non terminal Integer ARGUMENTOS;
 non terminal ARGUMENTO;
 
-non terminal LLAMADA_FUNCION;
+non terminal String LLAMADA_FUNCION;
 
 non terminal BLOQUE;
 non terminal BLOQUE_FUNCION;
@@ -626,16 +679,32 @@ TIPO_RETORNO ::=
 
 PARAMETRO ::=
       TIPO:tipo ID:id
-      {: registrarSimbolo((String) id, tipo, idleft, "parametro"); :}
+      {:
+          registrarSimbolo(
+              (String) id, tipo, idleft, "parametro"
+          );
+          RESULT = tipo;
+      :}
     ;
 
 
 PARAMETROS ::=
-      PARAMETRO
+      PARAMETRO:p
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(p);
+          RESULT = tipos;
+      :}
     ;
 
 PARAMETROS ::=
-      PARAMETRO COMA PARAMETROS
+      PARAMETRO:p COMA PARAMETROS:resto
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(p);
+          tipos.addAll(resto);
+          RESULT = tipos;
+      :}
     ;
 
 
@@ -646,21 +715,43 @@ PARAMETROS ::=
 DECLARACION_FUNCION ::=
       TIPO_RETORNO:tipo ID:id PAR_INI
       {:
-          registrarSimbolo((String) id, (String) tipo, idleft, "funcion");
+          registrarSimbolo(
+              (String) id, tipo, idleft, "funcion"
+          );
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
-      PAR_FIN BLOQUE_FUNCION
-      {: tablaSimbolos.cerrarAmbito(); :}
+      PAR_FIN
+      {:
+          registrarFirmaFuncion(
+              (String) id,
+              new ArrayList<String>(),
+              idleft
+          );
+      :}
+      BLOQUE_FUNCION
+      {:
+          tablaSimbolos.cerrarAmbito();
+      :}
     ;
 
 DECLARACION_FUNCION ::=
       TIPO_RETORNO:tipo ID:id PAR_INI
       {:
-          registrarSimbolo((String) id, (String) tipo, idleft, "funcion");
+          registrarSimbolo(
+              (String) id, tipo, idleft, "funcion"
+          );
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
-      PARAMETROS PAR_FIN BLOQUE_FUNCION
-      {: tablaSimbolos.cerrarAmbito(); :}
+      PARAMETROS:tipos PAR_FIN
+      {:
+          registrarFirmaFuncion(
+              (String) id, tipos, idleft
+          );
+      :}
+      BLOQUE_FUNCION
+      {:
+          tablaSimbolos.cerrarAmbito();
+      :}
     ;
 
 
@@ -675,10 +766,16 @@ ARGUMENTO ::=
 
 ARGUMENTOS ::=
       ARGUMENTO
+      {:
+          RESULT = 1;
+      :}
     ;
 
 ARGUMENTOS ::=
-      ARGUMENTO COMA ARGUMENTOS
+      ARGUMENTO COMA ARGUMENTOS:resto
+      {:
+          RESULT = 1 + resto;
+      :}
     ;
 
 
@@ -687,11 +784,21 @@ ARGUMENTOS ::=
    ========================================== */
 
 LLAMADA_FUNCION ::=
-      ID PAR_INI PAR_FIN
+      ID:id PAR_INI PAR_FIN
+      {:
+          RESULT = validarLlamadaFuncion(
+              (String) id, 0, idleft
+          );
+      :}
     ;
 
 LLAMADA_FUNCION ::=
-      ID PAR_INI ARGUMENTOS PAR_FIN
+      ID:id PAR_INI ARGUMENTOS:cantidad PAR_FIN
+      {:
+          RESULT = validarLlamadaFuncion(
+              (String) id, cantidad, idleft
+          );
+      :}
     ;
 
 
@@ -943,8 +1050,8 @@ OPERANDO ::=
     | EXPR_DECREMENTO:ed
       {: RESULT = ed; :}
 
-    | LLAMADA_FUNCION
-      {: RESULT = null; :}
+    | LLAMADA_FUNCION:lf
+      {: RESULT = lf; :}
     ;
 
 
