@@ -1046,8 +1046,8 @@ OPERANDO_RELACIONAL ::=
     ;
 
 OPERANDO_RELACIONAL ::=
-      EXPR_LOGICA
-      {: RESULT = "bool"; :}
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
     ;
 
 OPERANDO_RELACIONAL ::=
