@@ -182,6 +182,50 @@ parser code {:
         }
     }
 
+    public void validarArreglo(
+        String nombre,
+        String tipo,
+        Integer tamano,
+        List<String> elementos,
+        int linea
+    ) {
+        if (tamano <= 0) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el arreglo '" + nombre
+                + "' debe tener un tamaño mayor que cero."
+            );
+        }
+
+        if (elementos == null) {
+            return;
+        }
+
+        if (elementos.size() != tamano) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el arreglo '" + nombre
+                + "' tiene tamaño " + tamano
+                + ", pero se proporcionaron " + elementos.size()
+                + " elementos."
+            );
+        }
+
+        for (int i = 0; i < elementos.size(); i++) {
+            String tipoElemento = elementos.get(i);
+
+            if (tipoElemento != null && !tipo.equals(tipoElemento)) {
+                erroresSemanticos.add(
+                    "[ERROR SEMANTICO] Linea " + linea
+                    + ": el elemento " + (i + 1)
+                    + " del arreglo '" + nombre
+                    + "' debe ser '" + tipo
+                    + "', pero se encontro '" + tipoElemento + "'."
+                );
+            }
+        }
+    }
+
     public void validarTipoAsignacion(
         String nombre,
         String tipoDeclarado,
@@ -645,8 +689,8 @@ non terminal ARREGLO;
 non terminal ASIGNACION_ARREGLO;
 non terminal String ACCESO_ARREGLO;
 
-non terminal TAMANO_ARREGLO;
-non terminal LISTA_EXPRESIONES;
+non terminal Integer TAMANO_ARREGLO;
+non terminal List LISTA_EXPRESIONES;
 non terminal String INDICE;
 
 non terminal ASIGNACION_VAR;
@@ -1528,22 +1572,49 @@ EXPR_SIN_ASIGNACION ::=
    ========================================== */
 
 LISTA_EXPRESIONES ::=
-      EXPRESION
-    | EXPRESION COMA LISTA_EXPRESIONES
+      EXPRESION:tipo
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          RESULT = tipos;
+      :}
+
+    | EXPRESION:tipo COMA LISTA_EXPRESIONES:resto
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          tipos.addAll(resto);
+          RESULT = tipos;
+      :}
     ;
 
 TAMANO_ARREGLO ::=
-      LIT_INT
+      LIT_INT:n
+      {:
+          RESULT = Integer.valueOf(n.toString());
+      :}
     ;
 
 ARREGLO ::=
-      VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO COR_FIN
+      VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
       ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
-      {: registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo"); :}
+      {:
+          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
+          validarArreglo((String) id, tipo, tamano, null, idleft);
+      :}
 
-    | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO COR_FIN
-      ASIGNACION BLOQUE_INI LISTA_EXPRESIONES BLOQUE_FIN FIN_EXPR
-      {: registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo"); :}
+    | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
+      ASIGNACION BLOQUE_INI LISTA_EXPRESIONES:elementos BLOQUE_FIN FIN_EXPR
+      {:
+          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
+          validarArreglo((String) id, tipo, tamano, elementos, idleft);
+      :}
+
+    | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN FIN_EXPR
+      {:
+          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
+          validarArreglo((String) id, tipo, tamano, null, idleft);
+      :}
     ;
 
 
