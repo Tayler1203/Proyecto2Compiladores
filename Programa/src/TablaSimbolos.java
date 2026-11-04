@@ -82,6 +82,33 @@ public final class TablaSimbolos {
     }
 
     /**
+     * Agrega un simbolo al ambito actual con tamaño de arreglo.
+     *
+     * @param nombre Nombre del simbolo.
+     * @param tipo Tipo del simbolo.
+     * @param linea Linea donde se declara.
+     * @param categoria Categoria del simbolo.
+     * @param tamano Tamaño del arreglo (null si no aplica).
+     * @return true si el simbolo se agrego correctamente; false si ya existia en el ambito actual.
+     */
+    public boolean agregarSimbolo(
+        String nombre,
+        String tipo,
+        int linea,
+        String categoria,
+        Integer tamano
+    ) {
+        boolean agregado = agregarSimbolo(nombre, tipo, linea, categoria);
+
+        if (agregado) {
+            Simbolo simbolo = buscarSimbolo(nombre);
+            simbolo.setTamanoArreglo(tamano);
+        }
+
+        return agregado;
+    }
+
+    /**
      * Busca un identificador desde el ambito actual
      * hasta el ambito global.
      *
@@ -265,6 +292,7 @@ public final class TablaSimbolos {
         private final String categoria;
         private List<String> tiposParametros = new ArrayList<>();
         private boolean parametrosRegistrados;
+        private Integer tamanoArreglo;
 
         /**
          * Nombre: Simbolo
@@ -360,6 +388,24 @@ public final class TablaSimbolos {
             this.tiposParametros = new ArrayList<>(tiposParametros);
             parametrosRegistrados = true;
             return true;
+        }
+
+        /**
+         * Obtiene el tamaño del arreglo.
+         *
+         * @return Tamaño del arreglo, o null si no es un arreglo.
+         */
+        public Integer getTamanoArreglo() {
+            return tamanoArreglo;
+        }
+
+        /**
+         * Establece el tamaño del arreglo.
+         *
+         * @param tamanoArreglo Tamaño del arreglo.
+         */
+        public void setTamanoArreglo(Integer tamanoArreglo) {
+            this.tamanoArreglo = tamanoArreglo;
         }
 
     }

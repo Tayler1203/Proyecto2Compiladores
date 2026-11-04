@@ -266,6 +266,47 @@ parser code {:
         return tipo.substring(0, tipo.length() - 2);
     }
 
+    public void registrarArreglo(
+        String nombre,
+        String tipo,
+        Integer tamano,
+        List<String> elementos,
+        int linea
+    ) {
+        boolean agregado = tablaSimbolos.agregarSimbolo(
+            nombre, tipo + "[]", linea, "arreglo", tamano
+        );
+
+        if (!agregado) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' ya fue declarado en este ambito."
+            );
+        }
+
+        validarArreglo(nombre, tipo, tamano, elementos, linea);
+    }
+
+    public void validarAsignacionArreglo(
+        String tipoElemento,
+        String tipoValor,
+        int linea
+    ) {
+        if (tipoElemento == null || tipoValor == null) {
+            return;
+        }
+
+        if (!tipoElemento.equals(tipoValor)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se puede asignar un valor de tipo '"
+                + tipoValor + "' a un elemento de tipo '"
+                + tipoElemento + "'."
+            );
+        }
+    }
+
     public void validarTipoAsignacion(
         String nombre,
         String tipoDeclarado,
@@ -1639,21 +1680,18 @@ ARREGLO ::=
       VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
       ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
       {:
-          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
-          validarArreglo((String) id, tipo, tamano, null, idleft);
+          registrarArreglo((String) id, tipo, tamano, null, idleft);
       :}
 
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
       ASIGNACION BLOQUE_INI LISTA_EXPRESIONES:elementos BLOQUE_FIN FIN_EXPR
       {:
-          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
-          validarArreglo((String) id, tipo, tamano, elementos, idleft);
+          registrarArreglo((String) id, tipo, tamano, elementos, idleft);
       :}
 
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN FIN_EXPR
       {:
-          registrarSimbolo((String) id, tipo + "[]", idleft, "arreglo");
-          validarArreglo((String) id, tipo, tamano, null, idleft);
+          registrarArreglo((String) id, tipo, tamano, null, idleft);
       :}
     ;
 
@@ -1683,7 +1721,13 @@ ACCESO_ARREGLO ::=
    ========================================== */
 
 ASIGNACION_ARREGLO ::=
-      ACCESO_ARREGLO ASIGNACION EXPRESION FIN_EXPR
+      ACCESO_ARREGLO:tipoElemento
+      ASIGNACION EXPRESION:tipoValor FIN_EXPR
+      {:
+          validarAsignacionArreglo(
+              tipoElemento, tipoValor, tipoElementoleft
+          );
+      :}
     ;
 
 
