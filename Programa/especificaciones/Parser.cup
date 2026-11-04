@@ -10,9 +10,8 @@ parser code {:
 
     public List<String> erroresSemanticos = new ArrayList<>();
 
-    private String tipoRetornoActual = null;
-    private String nombreFuncionActual = null;
     private int profundidadCiclos = 0;
+    private boolean encontroReturn = false;
 
     public void registrarSimbolo(
         String nombre,
@@ -134,7 +133,9 @@ parser code {:
     }
 
     public void validarReturn(String tipoExpresion, int linea) {
-        if (tipoRetornoActual == null) {
+        String nombre = tablaSimbolos.obtenerNombreFuncionActual();
+
+        if (nombre == null) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": return se encuentra fuera de una funcion."
@@ -142,7 +143,7 @@ parser code {:
             return;
         }
 
-        if (tipoRetornoActual.equals("void")) {
+        if ("principal".equals(nombre)) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": la funcion 'principal' es void y no puede retornar un valor."
@@ -150,16 +151,33 @@ parser code {:
             return;
         }
 
-        if (tipoExpresion == null) {
+        encontroReturn = true;
+
+        TablaSimbolos.Simbolo funcion =
+            tablaSimbolos.buscarFuncionGlobal(nombre);
+
+        if (funcion == null || tipoExpresion == null) {
             return;
         }
 
-        if (!tipoRetornoActual.equals(tipoExpresion)) {
+        String tipoEsperado = funcion.getTipo();
+
+        if (!tipoEsperado.equals(tipoExpresion)) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
-                + ": la funcion '" + nombreFuncionActual
-                + "' debe retornar '" + tipoRetornoActual
+                + ": la funcion '" + nombre
+                + "' debe retornar '" + tipoEsperado
                 + "', pero se encontro '" + tipoExpresion + "'."
+            );
+        }
+    }
+
+    public void validarReturnObligatorio(String nombre, int linea) {
+        if (!encontroReturn) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre
+                + "' debe contener al menos un return."
             );
         }
     }
@@ -772,17 +790,9 @@ DECLARACION_GLOBAL ::=
 
 FUNCION_MAIN ::=
       VOID PRINCIPAL PAR_INI PAR_FIN
-      {:
-          tipoRetornoActual = "void";
-          nombreFuncionActual = "principal";
-          tablaSimbolos.abrirAmbito("principal");
-      :}
+      {: tablaSimbolos.abrirAmbito("principal"); :}
       BLOQUE_FUNCION
-      {:
-          tablaSimbolos.cerrarAmbito();
-          tipoRetornoActual = null;
-          nombreFuncionActual = null;
-      :}
+      {: tablaSimbolos.cerrarAmbito(); :}
     ;
 
 
@@ -851,8 +861,7 @@ DECLARACION_FUNCION ::=
           registrarSimbolo(
               (String) id, tipo, idleft, "funcion"
           );
-          tipoRetornoActual = tipo;
-          nombreFuncionActual = (String) id;
+          encontroReturn = false;
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
       PAR_FIN
@@ -865,9 +874,8 @@ DECLARACION_FUNCION ::=
       :}
       BLOQUE_FUNCION
       {:
+          validarReturnObligatorio((String) id, idleft);
           tablaSimbolos.cerrarAmbito();
-          tipoRetornoActual = null;
-          nombreFuncionActual = null;
       :}
     ;
 
@@ -877,8 +885,7 @@ DECLARACION_FUNCION ::=
           registrarSimbolo(
               (String) id, tipo, idleft, "funcion"
           );
-          tipoRetornoActual = tipo;
-          nombreFuncionActual = (String) id;
+          encontroReturn = false;
           tablaSimbolos.abrirAmbito("funcion " + id);
       :}
       PARAMETROS:tipos PAR_FIN
@@ -889,9 +896,8 @@ DECLARACION_FUNCION ::=
       :}
       BLOQUE_FUNCION
       {:
+          validarReturnObligatorio((String) id, idleft);
           tablaSimbolos.cerrarAmbito();
-          tipoRetornoActual = null;
-          nombreFuncionActual = null;
       :}
     ;
 

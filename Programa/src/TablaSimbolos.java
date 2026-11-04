@@ -102,6 +102,45 @@ public final class TablaSimbolos {
     }
 
     /**
+     * Obtiene el nombre de la funcion actual recorriendo la pila de ambitos.
+     *
+     * @return Nombre de la funcion actual ("principal" o nombre de funcion normal),
+     *         o null si no estamos dentro de ninguna funcion.
+     */
+    public String obtenerNombreFuncionActual() {
+        for (Ambito ambito : pilaAmbitos) {
+            String nombre = ambito.getNombre();
+
+            if ("principal".equals(nombre)) {
+                return "principal";
+            }
+
+            if (nombre.startsWith("funcion ")) {
+                return nombre.substring("funcion ".length());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Busca una funcion en el ambito global por su nombre.
+     *
+     * @param nombre Nombre de la funcion a buscar.
+     * @return Simbolo de la funcion encontrada, o null si no existe.
+     */
+    public Simbolo buscarFuncionGlobal(String nombre) {
+        for (Simbolo simbolo : ambitos.get(0).getSimbolos()) {
+            if (simbolo.getNombre().equals(nombre)
+                && "funcion".equals(simbolo.getCategoria())) {
+                return simbolo;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Nombre: getAmbitos
      * Descripcion: Devuelve una vista inmodificable de todos los ambitos registrados en la tabla.
      * Salidas: No hay.
