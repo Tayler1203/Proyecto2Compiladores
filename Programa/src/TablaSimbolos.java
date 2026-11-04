@@ -167,6 +167,18 @@ public final class TablaSimbolos {
         return null;
     }
 
+    public boolean estaDentroDeCiclo() {
+        for (Ambito ambito : pilaAmbitos) {
+            String nombre = ambito.getNombre();
+
+            if (nombre.matches("(while|for) \\d+")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Nombre: getAmbitos
      * Descripcion: Devuelve una vista inmodificable de todos los ambitos registrados en la tabla.

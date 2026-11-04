@@ -10,7 +10,14 @@ parser code {:
 
     public List<String> erroresSemanticos = new ArrayList<>();
 
-    private int profundidadCiclos = 0;
+    private final java.util.Map<String, Integer> contadoresAmbitos = new java.util.HashMap<>();
+
+    private void abrirAmbitoEstructura(String tipo) {
+        int numero = contadoresAmbitos.getOrDefault(tipo, 0) + 1;
+        contadoresAmbitos.put(tipo, numero);
+        tablaSimbolos.abrirAmbito(tipo + " " + numero);
+    }
+
     private boolean encontroReturn = false;
 
     public void registrarSimbolo(
@@ -124,7 +131,7 @@ parser code {:
     }
 
     public void validarBreak(int linea) {
-        if (profundidadCiclos == 0) {
+        if (!tablaSimbolos.estaDentroDeCiclo()) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": break solo puede utilizarse dentro de un ciclo."
@@ -545,9 +552,9 @@ parser code {:
         List<String> tiposArgumentos,
         int linea
     ) {
-        TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarSimbolo(nombre);
+        TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarFuncionGlobal(nombre);
 
-        if (simbolo == null || !"funcion".equals(simbolo.getCategoria())) {
+        if (simbolo == null) {
             erroresSemanticos.add(
                 "[ERROR SEMANTICO] Linea " + linea
                 + ": la funcion '" + nombre + "' no ha sido declarada."
@@ -758,6 +765,7 @@ non terminal String LLAMADA_FUNCION;
 
 non terminal BLOQUE;
 non terminal BLOQUE_FUNCION;
+non terminal BLOQUE_CONTROL;
 
 non terminal LISTA_SENTENCIAS;
 non terminal SENTENCIA;
@@ -825,6 +833,8 @@ non terminal String GRUPO_PARENTESIS;
 non terminal SENTENCIA_IF;
 non terminal SENTENCIA_IF_RESTO;
 non terminal SENTENCIA_ELIF_LISTA;
+non terminal SENTENCIA_ELIF_CABECERA;
+non terminal SENTENCIA_ELSE;
 
 non terminal SENTENCIA_WHILE;
 
@@ -1082,6 +1092,11 @@ BLOQUE ::=
       BLOQUE_INI {: tablaSimbolos.abrirAmbitoBloque(); :}
       LISTA_SENTENCIAS BLOQUE_FIN
       {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+/* El ambito del bloque de control se abre desde su sentencia. */
+BLOQUE_CONTROL ::=
+      BLOQUE_INI LISTA_SENTENCIAS BLOQUE_FIN
     ;
 
 BLOQUE_FUNCION ::=
@@ -1790,37 +1805,43 @@ SENTENCIA_BREAK ::=
 
 SENTENCIA_IF ::=
       IF PAR_INI EXPRESION:cond PAR_FIN
-      BLOQUE SENTENCIA_IF_RESTO
+      {: abrirAmbitoEstructura("if"); :}
+      BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+      SENTENCIA_IF_RESTO
       {:
           validarCondicion(cond, "if", condleft);
       :}
     ;
 
-
 SENTENCIA_IF_RESTO ::=
       /* vacio */
     | SENTENCIA_ELIF_LISTA
-    | ELSE BLOQUE
-    | SENTENCIA_ELIF_LISTA ELSE BLOQUE
+    | SENTENCIA_ELSE
+    | SENTENCIA_ELIF_LISTA SENTENCIA_ELSE
     ;
 
-
-SENTENCIA_ELIF_LISTA ::=
-      ELIF PAR_INI EXPRESION:cond PAR_FIN BLOQUE
-      {:
-          validarCondicion(cond, "elif", condleft);
-      :}
+SENTENCIA_ELSE ::=
+      ELSE {: abrirAmbitoEstructura("else"); :}
+      BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
     ;
 
-
-SENTENCIA_ELIF_LISTA ::=
+SENTENCIA_ELIF_CABECERA ::=
       ELIF PAR_INI EXPRESION:cond PAR_FIN
-      BLOQUE SENTENCIA_ELIF_LISTA
       {:
           validarCondicion(cond, "elif", condleft);
+          abrirAmbitoEstructura("elif");
       :}
     ;
 
+SENTENCIA_ELIF_LISTA ::=
+      SENTENCIA_ELIF_CABECERA BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+    | SENTENCIA_ELIF_CABECERA BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+      SENTENCIA_ELIF_LISTA
+    ;
 
 /* ==========================================
    23. WHILE
@@ -1829,11 +1850,11 @@ SENTENCIA_ELIF_LISTA ::=
 SENTENCIA_WHILE ::=
       WHILE PAR_INI EXPRESION:cond PAR_FIN
       {:
-          profundidadCiclos++;
+          abrirAmbitoEstructura("while");
       :}
-      BLOQUE
+      BLOQUE_CONTROL
       {:
-          profundidadCiclos--;
+          tablaSimbolos.cerrarAmbito();
           validarCondicion(cond, "while", condleft);
       :}
     ;
@@ -1866,15 +1887,20 @@ SENTENCIA_FOR_INCREMENTO ::=
 
 
 SENTENCIA_FOR ::=
-      FOR PAR_INI SENTENCIA_FOR_INIT
+      FOR PAR_INI
+      {:
+          abrirAmbitoEstructura("for");
+      :}
+      SENTENCIA_FOR_INIT
       EXPRESION:cond FIN_EXPR
       SENTENCIA_FOR_INCREMENTO PAR_FIN
       {:
-          profundidadCiclos++;
+          tablaSimbolos.abrirAmbito("Cuerpo");
       :}
-      BLOQUE
+      BLOQUE_CONTROL
       {:
-          profundidadCiclos--;
+          tablaSimbolos.cerrarAmbito(); // Cuerpo
           validarCondicion(cond, "for", condleft);
+          tablaSimbolos.cerrarAmbito(); // for
       :}
     ;
