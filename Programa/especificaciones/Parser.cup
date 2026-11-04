@@ -226,6 +226,46 @@ parser code {:
         }
     }
 
+    public String validarAccesoArreglo(
+        String nombre,
+        String tipoIndice,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return null;
+        }
+
+        if (!"arreglo".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' no es un arreglo."
+            );
+            return null;
+        }
+
+        if (tipoIndice == null) {
+            return null;
+        }
+
+        if (!"int".equals(tipoIndice)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el indice del arreglo '" + nombre
+                + "' debe ser de tipo int, pero se encontro '"
+                + tipoIndice + "'."
+            );
+            return null;
+        }
+
+        String tipo = simbolo.getTipo();
+        return tipo.substring(0, tipo.length() - 2);
+    }
+
     public void validarTipoAsignacion(
         String nombre,
         String tipoDeclarado,
@@ -1629,21 +1669,11 @@ INDICE ::=
 
 
 ACCESO_ARREGLO ::=
-      ID:id COR_INI INDICE COR_FIN
+      ID:id COR_INI INDICE:tipoIndice COR_FIN
       {:
-          validarIdentificador((String) id, idleft);
-          TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarSimbolo((String) id);
-          if (simbolo != null) {
-              String tipo = simbolo.getTipo();
-              // Eliminar los corchetes del tipo de arreglo
-              if (tipo.endsWith("[]")) {
-                  RESULT = tipo.substring(0, tipo.length() - 2);
-              } else {
-                  RESULT = tipo;
-              }
-          } else {
-              RESULT = null;
-          }
+          RESULT = validarAccesoArreglo(
+              (String) id, tipoIndice, idleft
+          );
       :}
     ;
 
