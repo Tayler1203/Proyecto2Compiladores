@@ -29,6 +29,7 @@ public class Main {
         String rutaErroresSintacticos = "salida/errores_sintacticos.txt";
         String rutaErroresSemanticos = "salida/errores_semanticos.txt";
         String rutaTablaSimbolos = "salida/tabla_simbolos.txt";
+        String rutaCodigoIntermedio = "salida/codigo_intermedio.txt";
 
         boolean huboErroresLexicos = analizarLexico(
             rutaEntrada,
@@ -295,6 +296,22 @@ public class Main {
                 parser.getTablaSimbolos(),
                 rutaTablaSimbolos
             );
+        }
+
+        if (parser != null) {
+            try {
+                String rutaCodigoIntermedio = "salida/codigo_intermedio.txt";
+                parser.getGenerador().guardar(rutaCodigoIntermedio);
+                System.out.println(
+                    "Codigo intermedio guardado en: "
+                    + rutaCodigoIntermedio
+                );
+            } catch (IOException e) {
+                System.out.println(
+                    "Error al guardar codigo intermedio: "
+                    + e.getMessage()
+                );
+            }
         }
 
         return huboErrores;
