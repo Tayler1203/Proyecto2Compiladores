@@ -49,9 +49,12 @@ public class GeneradorCodigoIntermedio {
       return null;
     }
 
-    String lugar = operando.getLugar() == null
-        ? null
-        : "Σ є:" + operando.getLugar() + ":э";
+    String lugar = null;
+
+    if (operando.getLugar() != null) {
+      lugar = nuevoTemporal();
+      emitir(lugar + " = Σ " + operando.getLugar());
+    }
 
     return crearResultado(tipo, lugar);
   }
