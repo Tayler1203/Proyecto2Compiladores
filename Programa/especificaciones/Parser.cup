@@ -626,15 +626,104 @@ parser code {:
         return tipo;
     }
 
-    private ResultadoExpresion crearResultado(
-        String tipo,
-        String lugar
+    private String obtenerTipo(ResultadoExpresion expresion) {
+        return expresion != null ? expresion.getTipo() : null;
+    }
+
+    private ResultadoExpresion procesarLlamadaFuncion(
+        String nombre,
+        List<ResultadoExpresion> argumentos,
+        int linea
     ) {
-        if (tipo == null) {
-            return null;
+        List<String> tipos = new ArrayList<>();
+
+        for (ResultadoExpresion argumento : argumentos) {
+            tipos.add(obtenerTipo(argumento));
         }
 
-        return new ResultadoExpresion(tipo, lugar);
+        String tipo = validarLlamadaFuncion(
+            nombre, tipos, linea
+        );
+
+        return generador.crearLlamadaFuncion(
+            nombre, argumentos, tipo
+        );
+    }
+
+    private ResultadoExpresion procesarAccesoArreglo(
+        String nombre,
+        ResultadoExpresion indice,
+        int linea
+    ) {
+        String tipo = validarAccesoArreglo(
+            nombre,
+            obtenerTipo(indice),
+            linea
+        );
+
+        return generador.crearAccesoArreglo(
+            nombre, indice, tipo
+        );
+    }
+
+    private List<String> obtenerTipos(
+        List<ResultadoExpresion> expresiones
+    ) {
+        List<String> tipos = new ArrayList<>();
+
+        for (ResultadoExpresion expresion : expresiones) {
+            tipos.add(obtenerTipo(expresion));
+        }
+
+        return tipos;
+    }
+
+    private ResultadoExpresion combinarOperacion(
+        ResultadoExpresion izquierdo,
+        ResultadoExpresion derecho,
+        String operador,
+        int linea
+    ) {
+        if (izquierdo == null || derecho == null) return null;
+        String tipo = validarOperacionAritmetica(
+            izquierdo.getTipo(), derecho.getTipo(), operador, linea
+        );
+        return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
+    }
+
+    private ResultadoExpresion combinarOperacionRelacional(
+        ResultadoExpresion izquierdo,
+        ResultadoExpresion derecho,
+        String operador,
+        int linea
+    ) {
+        if (izquierdo == null || derecho == null) return null;
+        String tipo = validarOperacionRelacional(
+            izquierdo.getTipo(), derecho.getTipo(), operador, linea
+        );
+        return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
+    }
+
+    private ResultadoExpresion combinarOperacionLogica(
+        ResultadoExpresion izquierdo,
+        ResultadoExpresion derecho,
+        String operador,
+        int linea
+    ) {
+        if (izquierdo == null || derecho == null) return null;
+        String tipo = validarOperacionLogica(
+            izquierdo.getTipo(), derecho.getTipo(), operador, linea
+        );
+        return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
+    }
+
+    private ResultadoExpresion combinarNegacionLogica(
+        ResultadoExpresion operando,
+        int linea
+    ) {
+        if (operando == null) return null;
+        String tipo = validarNegacionLogica(operando.getTipo(), linea);
+        return generador.crearNegacion(operando, tipo);
     }
 
     public boolean huboErrorSemantico() {
@@ -777,9 +866,9 @@ non terminal List PARAMETROS;
 non terminal String PARAMETRO;
 
 non terminal List ARGUMENTOS;
-non terminal String ARGUMENTO;
+non terminal ResultadoExpresion ARGUMENTO;
 
-non terminal String LLAMADA_FUNCION;
+non terminal ResultadoExpresion LLAMADA_FUNCION;
 
 non terminal BLOQUE;
 non terminal BLOQUE_FUNCION;
@@ -794,18 +883,18 @@ non terminal DECLARACION_VAR_ASIGNADA;
 non terminal ARREGLO;
 
 non terminal ASIGNACION_ARREGLO;
-non terminal String ACCESO_ARREGLO;
+non terminal ResultadoExpresion ACCESO_ARREGLO;
 
 non terminal Integer TAMANO_ARREGLO;
 non terminal List LISTA_EXPRESIONES;
-non terminal String INDICE;
+non terminal ResultadoExpresion INDICE;
 
 non terminal ASIGNACION_VAR;
 non terminal ASIGNACION_VAR_SIN_FIN;
 
 non terminal EXPR_SIN_ASIGNACION;
 
-non terminal String EXPRESION;
+non terminal ResultadoExpresion EXPRESION;
 
 
 /* ==========================================
@@ -820,28 +909,28 @@ non terminal String EXPR_DECREMENTO;
 
 non terminal ResultadoExpresion OPERANDO;
 
-non terminal String EXPR_POTENCIA;
-non terminal String EXPR_SUMA_RESTA;
-non terminal String EXPR_MULT_DIV;
-non terminal String EXPR_ARITMETICA;
+non terminal ResultadoExpresion EXPR_POTENCIA;
+non terminal ResultadoExpresion EXPR_SUMA_RESTA;
+non terminal ResultadoExpresion EXPR_MULT_DIV;
+non terminal ResultadoExpresion EXPR_ARITMETICA;
 
 
 /* ==========================================
    EXPRESIONES RELACIONALES
    ========================================== */
 
-non terminal String OPERANDO_RELACIONAL;
-non terminal String EXPR_RELACIONAL;
+non terminal ResultadoExpresion OPERANDO_RELACIONAL;
+non terminal ResultadoExpresion EXPR_RELACIONAL;
 
 
 /* ==========================================
    EXPRESIONES LOGICAS
    ========================================== */
 
-non terminal String OPERANDO_LOGICO;
-non terminal String EXPR_LOGICA;
-non terminal String EXPR_NEGACION_LOGICA;
-non terminal String GRUPO_PARENTESIS;
+non terminal ResultadoExpresion OPERANDO_LOGICO;
+non terminal ResultadoExpresion EXPR_LOGICA;
+non terminal ResultadoExpresion EXPR_NEGACION_LOGICA;
+non terminal ResultadoExpresion GRUPO_PARENTESIS;
 
 
 /* ==========================================
@@ -1059,24 +1148,26 @@ DECLARACION_FUNCION ::=
    7. ARGUMENTOS
    ========================================== */
 
-ARGUMENTO ::= EXPRESION:tipo
-      {: RESULT = tipo; :}
+ARGUMENTO ::= EXPRESION:expr
+      {: RESULT = expr; :}
     ;
 
-ARGUMENTOS ::= ARGUMENTO:tipo
+ARGUMENTOS ::= ARGUMENTO:arg
       {:
-          List<String> tipos = new ArrayList<>();
-          tipos.add(tipo);
-          RESULT = tipos;
+          List<ResultadoExpresion> argumentos =
+              new ArrayList<>();
+          argumentos.add(arg);
+          RESULT = argumentos;
       :}
     ;
 
-ARGUMENTOS ::= ARGUMENTO:tipo COMA ARGUMENTOS:resto
+ARGUMENTOS ::= ARGUMENTO:arg COMA ARGUMENTOS:resto
       {:
-          List<String> tipos = new ArrayList<>();
-          tipos.add(tipo);
-          tipos.addAll(resto);
-          RESULT = tipos;
+          List<ResultadoExpresion> argumentos =
+              new ArrayList<>();
+          argumentos.add(arg);
+          argumentos.addAll(resto);
+          RESULT = argumentos;
       :}
     ;
 
@@ -1087,16 +1178,20 @@ ARGUMENTOS ::= ARGUMENTO:tipo COMA ARGUMENTOS:resto
 
 LLAMADA_FUNCION ::= ID:id PAR_INI PAR_FIN
       {:
-          RESULT = validarLlamadaFuncion(
-              (String) id, new ArrayList<String>(), idleft
+          RESULT = procesarLlamadaFuncion(
+              (String) id,
+              new ArrayList<ResultadoExpresion>(),
+              idleft
           );
       :}
     ;
 
-LLAMADA_FUNCION ::= ID:id PAR_INI ARGUMENTOS:tipos PAR_FIN
+LLAMADA_FUNCION ::= ID:id PAR_INI ARGUMENTOS:argumentos PAR_FIN
       {:
-          RESULT = validarLlamadaFuncion(
-              (String) id, tipos, idleft
+          RESULT = procesarLlamadaFuncion(
+              (String) id,
+              argumentos,
+              idleft
           );
       :}
     ;
@@ -1319,44 +1414,44 @@ OPERANDO ::=
               tablaSimbolos.buscarSimbolo((String) id);
 
           RESULT = (simbolo != null)
-              ? crearResultado(simbolo.getTipo(), (String) id)
+              ? generador.crearResultado(simbolo.getTipo(), (String) id)
               : null;
       :}
 
     | LIT_INT:valor
-      {: RESULT = crearResultado("int", (String) valor); :}
+      {: RESULT = generador.crearResultado("int", (String) valor); :}
 
     | LIT_FLOAT:valor
-      {: RESULT = crearResultado("float", (String) valor); :}
+      {: RESULT = generador.crearResultado("float", (String) valor); :}
 
     // PENDIENTE: Consultar con el profesor si estos literales
     // deben ser permitidos en operandos aritméticos
     | LIT_BOOL:valor
-      {: RESULT = crearResultado("bool", (String) valor); :}
+      {: RESULT = generador.crearResultado("bool", (String) valor); :}
 
     | LIT_STRING:valor
-      {: RESULT = crearResultado("string", (String) valor); :}
+      {: RESULT = generador.crearResultado("string", (String) valor); :}
 
     | LIT_CHAR:valor
-      {: RESULT = crearResultado("char", (String) valor); :}
+      {: RESULT = generador.crearResultado("char", (String) valor); :}
 
     | ACCESO_ARREGLO:aa
-      {: RESULT = crearResultado(aa, null); :}
+      {: RESULT = aa; :}
 
     | GRUPO_PARENTESIS:gp
-      {: RESULT = crearResultado(gp, null); :}
+      {: RESULT = gp; :}
 
     | EXPR_NEGATIVO:en
-      {: RESULT = crearResultado(en, null); :}
+      {: RESULT = generador.crearResultado(en, null); :}
 
     | EXPR_INCREMENTO:ei
-      {: RESULT = crearResultado(ei, null); :}
+      {: RESULT = generador.crearResultado(ei, null); :}
 
     | EXPR_DECREMENTO:ed
-      {: RESULT = crearResultado(ed, null); :}
+      {: RESULT = generador.crearResultado(ed, null); :}
 
     | LLAMADA_FUNCION:lf
-      {: RESULT = crearResultado(lf, null); :}
+      {: RESULT = lf; :}
     ;
 
 
@@ -1364,17 +1459,12 @@ OPERANDO ::=
 
 EXPR_POTENCIA ::=
       OPERANDO:op
-      {:
-          RESULT = op != null ? op.getTipo() : null;
-      :}
+      {: RESULT = op; :}
 
     | OPERANDO:izq POTENCIA EXPR_POTENCIA:der
       {:
-          RESULT = validarOperacionAritmetica(
-              izq != null ? izq.getTipo() : null,
-              der,
-              "pot",
-              izqleft
+          RESULT = combinarOperacion(
+              izq, der, "pot", izqleft
           );
       :}
     ;
@@ -1388,14 +1478,14 @@ EXPR_SUMA_RESTA ::=
 
     | EXPR_SUMA_RESTA:izq SUMA EXPR_POTENCIA:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "+", izqleft
           );
       :}
 
     | EXPR_SUMA_RESTA:izq RESTA EXPR_POTENCIA:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "-", izqleft
           );
       :}
@@ -1410,21 +1500,21 @@ EXPR_MULT_DIV ::=
 
     | EXPR_MULT_DIV:izq MULTIPLICACION EXPR_SUMA_RESTA:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "*", izqleft
           );
       :}
 
     | EXPR_MULT_DIV:izq DIVISION EXPR_SUMA_RESTA:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "/", izqleft
           );
       :}
 
     | EXPR_MULT_DIV:izq DIVISION_ENTERA EXPR_SUMA_RESTA:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "//", izqleft
           );
       :}
@@ -1439,7 +1529,7 @@ EXPR_ARITMETICA ::=
 
     | EXPR_ARITMETICA:izq MODULO EXPR_MULT_DIV:der
       {:
-          RESULT = validarOperacionAritmetica(
+          RESULT = combinarOperacion(
               izq, der, "mod", izqleft
           );
       :}
@@ -1479,7 +1569,7 @@ EXPR_RELACIONAL ::=
       MENOR
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, "<", izqleft
           );
       :}
@@ -1492,7 +1582,7 @@ EXPR_RELACIONAL ::=
       MENOR_IGUAL
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, "<=", izqleft
           );
       :}
@@ -1505,7 +1595,7 @@ EXPR_RELACIONAL ::=
       MAYOR
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, ">", izqleft
           );
       :}
@@ -1518,7 +1608,7 @@ EXPR_RELACIONAL ::=
       MAYOR_IGUAL
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, ">=", izqleft
           );
       :}
@@ -1531,7 +1621,7 @@ EXPR_RELACIONAL ::=
       IGUAL
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, "==", izqleft
           );
       :}
@@ -1544,7 +1634,7 @@ EXPR_RELACIONAL ::=
       DIFERENTE
       COR_INI OPERANDO_RELACIONAL:der COR_FIN
       {:
-          RESULT = validarOperacionRelacional(
+          RESULT = combinarOperacionRelacional(
               izq, der, "!=", izqleft
           );
       :}
@@ -1589,7 +1679,7 @@ EXPR_LOGICA ::=
       AND
       GRUPO_PARENTESIS:der
       {:
-          RESULT = validarOperacionLogica(
+          RESULT = combinarOperacionLogica(
               izq, der, "λ", izqleft
           );
       :}
@@ -1603,7 +1693,7 @@ EXPR_LOGICA ::=
       OR
       GRUPO_PARENTESIS:der
       {:
-          RESULT = validarOperacionLogica(
+          RESULT = combinarOperacionLogica(
               izq, der, "θ", izqleft
           );
       :}
@@ -1615,7 +1705,7 @@ EXPR_LOGICA ::=
 EXPR_NEGACION_LOGICA ::=
       NOT GRUPO_PARENTESIS:gp
       {:
-          RESULT = validarNegacionLogica(
+          RESULT = combinarNegacionLogica(
               gp, gpleft
           );
       :}
@@ -1636,7 +1726,12 @@ DECLARACION_VAR_ASIGNADA ::=
       VAL TIPO:tipo ID:id ASIGNACION EXPRESION:expr FIN_EXPR
       {:
           registrarSimbolo((String) id, tipo, idleft, "variable");
-          validarTipoAsignacion((String) id, tipo, expr, idleft);
+          validarTipoAsignacion(
+              (String) id,
+              tipo,
+              obtenerTipo(expr),
+              idleft
+          );
       :}
     ;
 
@@ -1653,7 +1748,7 @@ ASIGNACION_VAR ::=
               validarTipoAsignacion(
                   (String) id,
                   simbolo.getTipo(),
-                  expr,
+                  obtenerTipo(expr),
                   idleft
               );
           }
@@ -1673,7 +1768,7 @@ ASIGNACION_VAR_SIN_FIN ::=
               validarTipoAsignacion(
                   (String) id,
                   simbolo.getTipo(),
-                  expr,
+                  obtenerTipo(expr),
                   idleft
               );
           }
@@ -1691,19 +1786,19 @@ EXPR_SIN_ASIGNACION ::=
    ========================================== */
 
 LISTA_EXPRESIONES ::=
-      EXPRESION:tipo
+      EXPRESION:expr
       {:
-          List<String> tipos = new ArrayList<>();
-          tipos.add(tipo);
-          RESULT = tipos;
+          List<ResultadoExpresion> elementos = new ArrayList<>();
+          elementos.add(expr);
+          RESULT = elementos;
       :}
 
-    | EXPRESION:tipo COMA LISTA_EXPRESIONES:resto
+    | EXPRESION:expr COMA LISTA_EXPRESIONES:resto
       {:
-          List<String> tipos = new ArrayList<>();
-          tipos.add(tipo);
-          tipos.addAll(resto);
-          RESULT = tipos;
+          List<ResultadoExpresion> elementos = new ArrayList<>();
+          elementos.add(expr);
+          elementos.addAll(resto);
+          RESULT = elementos;
       :}
     ;
 
@@ -1724,7 +1819,10 @@ ARREGLO ::=
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
       ASIGNACION BLOQUE_INI LISTA_EXPRESIONES:elementos BLOQUE_FIN FIN_EXPR
       {:
-          registrarArreglo((String) id, tipo, tamano, elementos, idleft);
+          registrarArreglo(
+              (String) id, tipo, tamano,
+              obtenerTipos(elementos), idleft
+          );
       :}
 
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN FIN_EXPR
@@ -1745,10 +1843,12 @@ INDICE ::=
 
 
 ACCESO_ARREGLO ::=
-      ID:id COR_INI INDICE:tipoIndice COR_FIN
+      ID:id COR_INI INDICE:indice COR_FIN
       {:
-          RESULT = validarAccesoArreglo(
-              (String) id, tipoIndice, idleft
+          RESULT = procesarAccesoArreglo(
+              (String) id,
+              indice,
+              idleft
           );
       :}
     ;
@@ -1759,11 +1859,13 @@ ACCESO_ARREGLO ::=
    ========================================== */
 
 ASIGNACION_ARREGLO ::=
-      ACCESO_ARREGLO:tipoElemento
-      ASIGNACION EXPRESION:tipoValor FIN_EXPR
+      ACCESO_ARREGLO:elemento
+      ASIGNACION EXPRESION:valor FIN_EXPR
       {:
           validarAsignacionArreglo(
-              tipoElemento, tipoValor, tipoElementoleft
+              obtenerTipo(elemento),
+              obtenerTipo(valor),
+              elementoleft
           );
       :}
     ;
@@ -1807,9 +1909,9 @@ SENTENCIA_WRITE ::=
    ========================================== */
 
 SENTENCIA_RETURN ::=
-      RETURN:r EXPRESION:tipo FIN_EXPR
+      RETURN:r EXPRESION:expr FIN_EXPR
       {:
-          validarReturn(tipo, rleft);
+          validarReturn(obtenerTipo(expr), rleft);
       :}
     ;
 
@@ -1833,7 +1935,7 @@ SENTENCIA_IF ::=
       {: tablaSimbolos.cerrarAmbito(); :}
       SENTENCIA_IF_RESTO
       {:
-          validarCondicion(cond, "if", condleft);
+          validarCondicion(obtenerTipo(cond), "if", condleft);
       :}
     ;
 
@@ -1853,7 +1955,7 @@ SENTENCIA_ELSE ::=
 SENTENCIA_ELIF_CABECERA ::=
       ELIF PAR_INI EXPRESION:cond PAR_FIN
       {:
-          validarCondicion(cond, "elif", condleft);
+          validarCondicion(obtenerTipo(cond), "elif", condleft);
           abrirAmbitoEstructura("elif");
       :}
     ;
@@ -1878,7 +1980,7 @@ SENTENCIA_WHILE ::=
       BLOQUE_CONTROL
       {:
           tablaSimbolos.cerrarAmbito();
-          validarCondicion(cond, "while", condleft);
+          validarCondicion(obtenerTipo(cond), "while", condleft);
       :}
     ;
 
@@ -1923,7 +2025,7 @@ SENTENCIA_FOR ::=
       BLOQUE_CONTROL
       {:
           tablaSimbolos.cerrarAmbito(); // Cuerpo
-          validarCondicion(cond, "for", condleft);
+          validarCondicion(obtenerTipo(cond), "for", condleft);
           tablaSimbolos.cerrarAmbito(); // for
       :}
     ;
