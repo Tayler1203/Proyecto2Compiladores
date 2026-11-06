@@ -1,0 +1,1929 @@
+import java_cup.runtime.*;
+import java.util.ArrayList;
+import java.util.List;
+
+parser code {:
+
+    public List<String> erroresSintacticos = new ArrayList<>();
+
+    private final TablaSimbolos tablaSimbolos = new TablaSimbolos();
+
+    private final GeneradorCodigoIntermedio generador =
+        new GeneradorCodigoIntermedio();
+
+    public GeneradorCodigoIntermedio getGenerador() {
+        return generador;
+    }
+
+    public List<String> erroresSemanticos = new ArrayList<>();
+
+    private final java.util.Map<String, Integer> contadoresAmbitos = new java.util.HashMap<>();
+
+    private void abrirAmbitoEstructura(String tipo) {
+        int numero = contadoresAmbitos.getOrDefault(tipo, 0) + 1;
+        contadoresAmbitos.put(tipo, numero);
+        tablaSimbolos.abrirAmbito(tipo + " " + numero);
+    }
+
+    private boolean encontroReturn = false;
+
+    public void registrarSimbolo(
+        String nombre,
+        String tipo,
+        int linea,
+        String categoria
+    ) {
+        boolean agregado = tablaSimbolos.agregarSimbolo(
+            nombre, tipo, linea, categoria
+        );
+
+        if (!agregado) {
+            String mensaje =
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' ya fue declarado en este ambito.";
+
+            erroresSemanticos.add(mensaje);
+        }
+    }
+
+    /**
+     * Comprueba que un identificador exista en un ambito accesible.
+     *
+     * @param nombre Nombre del identificador.
+     * @param linea Linea donde se utiliza.
+     */
+    public void validarIdentificador(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            String mensaje =
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' no ha sido declarado o esta fuera de su ambito.";
+
+            erroresSemanticos.add(mensaje);
+        }
+    }
+
+    public void validarRead(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return;
+        }
+
+        if (!"variable".equals(simbolo.getCategoria())
+            && !"parametro".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": read requiere una variable, pero '"
+                + nombre + "' no es una variable."
+            );
+            return;
+        }
+
+        String tipo = simbolo.getTipo();
+
+        if (!tipo.equals("int")
+            && !tipo.equals("float")
+            && !tipo.equals("char")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": read solo admite variables int, float o char; '"
+                + nombre + "' es de tipo '" + tipo + "'."
+            );
+        }
+    }
+
+    public void validarWriteIdentificador(String nombre, int linea) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return;
+        }
+
+        if (!"variable".equals(simbolo.getCategoria())
+            && !"parametro".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": write requiere un literal o una variable, pero '"
+                + nombre + "' no es una variable."
+            );
+            return;
+        }
+
+        validarWriteTipo(simbolo.getTipo(), linea);
+    }
+
+    public void validarWriteTipo(String tipo, int linea) {
+        if (tipo == null) {
+            return;
+        }
+
+        if (!tipo.equals("int")
+            && !tipo.equals("float")
+            && !tipo.equals("bool")
+            && !tipo.equals("string")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": write no admite valores de tipo '" + tipo + "'."
+            );
+        }
+    }
+
+    public void validarBreak(int linea) {
+        if (!tablaSimbolos.estaDentroDeCiclo()) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": break solo puede utilizarse dentro de un ciclo."
+            );
+        }
+    }
+
+    public void validarReturn(String tipoExpresion, int linea) {
+        String nombre = tablaSimbolos.obtenerNombreFuncionActual();
+
+        if (nombre == null) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": return se encuentra fuera de una funcion."
+            );
+            return;
+        }
+
+        if ("principal".equals(nombre)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion 'principal' es void y no puede retornar un valor."
+            );
+            return;
+        }
+
+        encontroReturn = true;
+
+        TablaSimbolos.Simbolo funcion =
+            tablaSimbolos.buscarFuncionGlobal(nombre);
+
+        if (funcion == null || tipoExpresion == null) {
+            return;
+        }
+
+        String tipoEsperado = funcion.getTipo();
+
+        if (!tipoEsperado.equals(tipoExpresion)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre
+                + "' debe retornar '" + tipoEsperado
+                + "', pero se encontro '" + tipoExpresion + "'."
+            );
+        }
+    }
+
+    public void validarReturnObligatorio(String nombre, int linea) {
+        if (!encontroReturn) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre
+                + "' debe contener al menos un return."
+            );
+        }
+    }
+
+    public void validarArreglo(
+        String nombre,
+        String tipo,
+        Integer tamano,
+        List<String> elementos,
+        int linea
+    ) {
+        if (tamano <= 0) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el arreglo '" + nombre
+                + "' debe tener un tamaño mayor que cero."
+            );
+        }
+
+        if (elementos == null) {
+            return;
+        }
+
+        if (elementos.size() != tamano) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el arreglo '" + nombre
+                + "' tiene tamaño " + tamano
+                + ", pero se proporcionaron " + elementos.size()
+                + " elementos."
+            );
+        }
+
+        for (int i = 0; i < elementos.size(); i++) {
+            String tipoElemento = elementos.get(i);
+
+            if (tipoElemento != null && !tipo.equals(tipoElemento)) {
+                erroresSemanticos.add(
+                    "[ERROR SEMANTICO] Linea " + linea
+                    + ": el elemento " + (i + 1)
+                    + " del arreglo '" + nombre
+                    + "' debe ser '" + tipo
+                    + "', pero se encontro '" + tipoElemento + "'."
+                );
+            }
+        }
+    }
+
+    public String validarAccesoArreglo(
+        String nombre,
+        String tipoIndice,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return null;
+        }
+
+        if (!"arreglo".equals(simbolo.getCategoria())) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' no es un arreglo."
+            );
+            return null;
+        }
+
+        if (tipoIndice == null) {
+            return null;
+        }
+
+        if (!"int".equals(tipoIndice)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el indice del arreglo '" + nombre
+                + "' debe ser de tipo int, pero se encontro '"
+                + tipoIndice + "'."
+            );
+            return null;
+        }
+
+        String tipo = simbolo.getTipo();
+        return tipo.substring(0, tipo.length() - 2);
+    }
+
+    public void registrarArreglo(
+        String nombre,
+        String tipo,
+        Integer tamano,
+        List<String> elementos,
+        int linea
+    ) {
+        boolean agregado = tablaSimbolos.agregarSimbolo(
+            nombre, tipo + "[]", linea, "arreglo", tamano
+        );
+
+        if (!agregado) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el identificador '" + nombre
+                + "' ya fue declarado en este ambito."
+            );
+        }
+
+        validarArreglo(nombre, tipo, tamano, elementos, linea);
+    }
+
+    public void validarAsignacionArreglo(
+        String tipoElemento,
+        String tipoValor,
+        int linea
+    ) {
+        if (tipoElemento == null || tipoValor == null) {
+            return;
+        }
+
+        if (!tipoElemento.equals(tipoValor)) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se puede asignar un valor de tipo '"
+                + tipoValor + "' a un elemento de tipo '"
+                + tipoElemento + "'."
+            );
+        }
+    }
+
+    public void validarTipoAsignacion(
+        String nombre,
+        String tipoDeclarado,
+        String tipoExpresion,
+        int linea
+    ) {
+        if (tipoExpresion == null) {
+            return;
+        }
+
+        if (!tipoDeclarado.equals(tipoExpresion)) {
+            String mensaje =
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se puede asignar un valor de tipo '"
+                + tipoExpresion
+                + "' a la variable '" + nombre
+                + "' de tipo '" + tipoDeclarado + "'.";
+
+            erroresSemanticos.add(mensaje);
+        }
+    }
+
+    public String validarOperacionAritmetica(
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
+            return null;
+        }
+
+        boolean izquierdoEsNumerico =
+            tipoOperandoIzquierdo.equals("int")
+            || tipoOperandoIzquierdo.equals("float");
+
+        boolean derechoEsNumerico =
+            tipoOperandoDerecho.equals("int") || tipoOperandoDerecho.equals("float");
+
+        boolean tiposSonValidos;
+
+        switch (operador) {
+            case "//":
+            case "mod":
+            case "pot":
+                tiposSonValidos =
+                    tipoOperandoIzquierdo.equals("int")
+                    && tipoOperandoDerecho.equals("int");
+                break;
+
+            case "+":
+            case "-":
+            case "*":
+            case "/":
+                tiposSonValidos = izquierdoEsNumerico && derechoEsNumerico;
+                break;
+
+            default:
+                tiposSonValidos = false;
+                break;
+        }
+
+        if (!tiposSonValidos) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' no admite operandos de tipo '"
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
+            );
+            return null;
+        }
+
+        switch (operador) {
+            case "/":
+                return "float";
+
+            case "//":
+            case "mod":
+            case "pot":
+                return "int";
+
+            case "+":
+            case "-":
+            case "*":
+                if (tipoOperandoIzquierdo.equals("float")
+                    || tipoOperandoDerecho.equals("float")) {
+                    return "float";
+                }
+                return "int";
+
+            default:
+                return null;
+        }
+    }
+
+    public String validarOperacionRelacional(
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
+            return null;
+        }
+
+        boolean izquierdoEsNumerico =
+            tipoOperandoIzquierdo.equals("int") || tipoOperandoIzquierdo.equals("float");
+
+        boolean derechoEsNumerico =
+            tipoOperandoDerecho.equals("int") || tipoOperandoDerecho.equals("float");
+
+        boolean tiposSonValidos;
+
+        switch (operador) {
+            case "<":
+            case "<=":
+            case ">":
+            case ">=":
+                tiposSonValidos = izquierdoEsNumerico && derechoEsNumerico;
+                break;
+
+            case "==":
+            case "!=":
+                tiposSonValidos =
+                    (izquierdoEsNumerico && derechoEsNumerico)
+                    || (tipoOperandoIzquierdo.equals("bool")
+                        && tipoOperandoDerecho.equals("bool"))
+                    || (tipoOperandoIzquierdo.equals("char")
+                        && tipoOperandoDerecho.equals("char"));
+                break;
+
+            default:
+                return null;
+        }
+
+        if (!tiposSonValidos) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' no admite operandos de tipo '"
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
+            );
+            return null;
+        }
+
+        return "bool";
+    }
+
+    public String validarOperacionLogica(
+        String tipoOperandoIzquierdo,
+        String tipoOperandoDerecho,
+        String operador,
+        int linea
+    ) {
+        if (tipoOperandoIzquierdo == null || tipoOperandoDerecho == null) {
+            return null;
+        }
+
+        if (!tipoOperandoIzquierdo.equals("bool")
+            || !tipoOperandoDerecho.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' solo admite operandos de tipo 'bool', pero recibio '"
+                + tipoOperandoIzquierdo + "' y '"
+                + tipoOperandoDerecho + "'."
+            );
+            return null;
+        }
+
+        return "bool";
+    }
+
+    public String validarNegacionLogica(
+        String tipoOperando,
+        int linea
+    ) {
+        if (tipoOperando == null) {
+            return null;
+        }
+
+        if (!tipoOperando.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador 'Σ' solo admite operandos de tipo 'bool', pero recibio '"
+                + tipoOperando + "'."
+            );
+            return null;
+        }
+
+        return "bool";
+    }
+
+    public void validarCondicion(
+        String tipoCondicion,
+        String estructura,
+        int linea
+    ) {
+        if (tipoCondicion == null) {
+            return;
+        }
+
+        if (!tipoCondicion.equals("bool")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la condicion de '" + estructura
+                + "' debe ser de tipo 'bool', pero se obtuvo '"
+                + tipoCondicion + "'."
+            );
+        }
+    }
+
+    public void registrarFirmaFuncion(
+        String nombre,
+        List<String> tiposParametros,
+        int linea
+    ) {
+        boolean registrada =
+            tablaSimbolos.registrarParametrosFuncion(
+                nombre, tiposParametros
+            );
+
+        if (!registrada) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": no se pudo registrar la firma de la funcion '"
+                + nombre + "'."
+            );
+        }
+    }
+
+    public String validarLlamadaFuncion(
+        String nombre,
+        List<String> tiposArgumentos,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo = tablaSimbolos.buscarFuncionGlobal(nombre);
+
+        if (simbolo == null) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre + "' no ha sido declarada."
+            );
+            return null;
+        }
+
+        List<String> tiposEsperados = simbolo.getTiposParametros();
+        if (tiposEsperados.size() != tiposArgumentos.size()) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": la funcion '" + nombre + "' espera " + tiposEsperados.size()
+                + " argumento(s), pero recibio " + tiposArgumentos.size() + "."
+            );
+            return null;
+        }
+
+        boolean hayError = false;
+        for (int i = 0; i < tiposEsperados.size(); i++) {
+            String recibido = tiposArgumentos.get(i);
+            String esperado = tiposEsperados.get(i);
+            if (recibido == null) {
+                hayError = true; // Error previo en la expresion: no duplicar mensajes.
+            } else if (!esperado.equals(recibido)) {
+                erroresSemanticos.add(
+                    "[ERROR SEMANTICO] Linea " + linea
+                    + ": el argumento " + (i + 1) + " de la funcion '" + nombre
+                    + "' debe ser de tipo '" + esperado
+                    + "', pero se recibio '" + recibido + "'."
+                );
+                hayError = true;
+            }
+        }
+
+        return hayError ? null : simbolo.getTipo();
+    }
+
+    public String validarIncrementoDecremento(
+        String nombre,
+        String operador,
+        int linea
+    ) {
+        TablaSimbolos.Simbolo simbolo =
+            tablaSimbolos.buscarSimbolo(nombre);
+
+        if (simbolo == null) {
+            validarIdentificador(nombre, linea);
+            return null;
+        }
+
+        String tipo = simbolo.getTipo();
+
+        if (!tipo.equals("int") && !tipo.equals("float")) {
+            erroresSemanticos.add(
+                "[ERROR SEMANTICO] Linea " + linea
+                + ": el operador '" + operador
+                + "' solo puede aplicarse a variables int o float."
+            );
+            return null;
+        }
+
+        return tipo;
+    }
+
+    private ResultadoExpresion crearResultado(
+        String tipo,
+        String lugar
+    ) {
+        if (tipo == null) {
+            return null;
+        }
+
+        return new ResultadoExpresion(tipo, lugar);
+    }
+
+    public boolean huboErrorSemantico() {
+        return !erroresSemanticos.isEmpty();
+    }
+
+    public TablaSimbolos getTablaSimbolos() {
+        return tablaSimbolos;
+    }
+
+    public boolean huboErrorSintactico() {
+        return !erroresSintacticos.isEmpty();
+    }
+
+    public void syntax_error(Symbol s) {
+
+        String lexema =
+            (s != null && s.value != null)
+            ? String.valueOf(s.value)
+            : "EOF";
+
+        int linea =
+            (s != null && s.left >= 0)
+            ? s.left
+            : -1;
+
+        int columna =
+            (s != null && s.right >= 0)
+            ? s.right
+            : -1;
+
+        String mensaje;
+
+        if (s != null && s.sym == sym.EOF) {
+            mensaje =
+                "[ERROR SINTACTICO] Linea "
+                + linea
+                + ", columna "
+                + columna
+                + ": fin de archivo inesperado.";
+        } else {
+            mensaje =
+                "[ERROR SINTACTICO] Linea "
+                + linea
+                + ", columna "
+                + columna
+                + ": token inesperado -> '"
+                + lexema
+                + "'";
+        }
+
+        System.err.println(mensaje);
+        erroresSintacticos.add(mensaje);
+    }
+
+    public void unrecovered_syntax_error(Symbol s) {
+
+        int linea =
+            (s != null && s.left >= 0)
+            ? s.left
+            : -1;
+
+        int columna =
+            (s != null && s.right >= 0)
+            ? s.right
+            : -1;
+
+        String mensaje =
+            "[ERROR SINTACTICO IRRECUPERABLE] Linea "
+            + linea
+            + ", columna "
+            + columna
+            + ": no se pudo continuar el analisis.";
+
+        System.err.println(mensaje);
+        erroresSintacticos.add(mensaje);
+    }
+
+:};
+
+
+/* ==========================================
+   TERMINALES
+   ========================================== */
+
+terminal INT, FLOAT, BOOL, CHAR, STRING, VOID;
+
+terminal PRINCIPAL, IF, ELIF, ELSE, WHILE, FOR;
+terminal RETURN, BREAK, VAL, READ, WRITE;
+
+terminal INCREMENTO, DECREMENTO;
+terminal DIVISION_ENTERA;
+
+terminal SUMA, RESTA;
+terminal MULTIPLICACION, DIVISION;
+terminal MODULO, POTENCIA;
+
+terminal MENOR_IGUAL, MAYOR_IGUAL;
+terminal IGUAL, DIFERENTE;
+terminal MENOR, MAYOR;
+
+terminal AND, OR, NOT;
+
+terminal ASIGNACION;
+
+terminal BLOQUE_INI, BLOQUE_FIN;
+terminal PAR_INI, PAR_FIN;
+terminal COR_INI, COR_FIN;
+terminal FIN_EXPR;
+terminal COMA;
+
+terminal LIT_BOOL;
+terminal LIT_CHAR;
+terminal LIT_STRING;
+terminal LIT_FLOAT;
+terminal LIT_INT;
+
+terminal ID;
+
+
+/* ==========================================
+   NO TERMINALES
+   ========================================== */
+
+non terminal PROGRAMA;
+
+non terminal LISTA_ELEMENTOS;
+non terminal ELEMENTO_PROGRAMA;
+
+non terminal DECLARACION_GLOBAL;
+
+non terminal FUNCION_MAIN;
+
+non terminal DECLARACION_FUNCION;
+
+non terminal String TIPO_RETORNO;
+non terminal String TIPO;
+
+non terminal List PARAMETROS;
+non terminal String PARAMETRO;
+
+non terminal List ARGUMENTOS;
+non terminal String ARGUMENTO;
+
+non terminal String LLAMADA_FUNCION;
+
+non terminal BLOQUE;
+non terminal BLOQUE_FUNCION;
+non terminal BLOQUE_CONTROL;
+
+non terminal LISTA_SENTENCIAS;
+non terminal SENTENCIA;
+
+non terminal DECLARACION_VAR_SIMPLE;
+non terminal DECLARACION_VAR_ASIGNADA;
+
+non terminal ARREGLO;
+
+non terminal ASIGNACION_ARREGLO;
+non terminal String ACCESO_ARREGLO;
+
+non terminal Integer TAMANO_ARREGLO;
+non terminal List LISTA_EXPRESIONES;
+non terminal String INDICE;
+
+non terminal ASIGNACION_VAR;
+non terminal ASIGNACION_VAR_SIN_FIN;
+
+non terminal EXPR_SIN_ASIGNACION;
+
+non terminal String EXPRESION;
+
+
+/* ==========================================
+   EXPRESIONES ARITMETICAS
+   ========================================== */
+
+non terminal OP_NEG;
+
+non terminal String EXPR_NEGATIVO;
+non terminal String EXPR_INCREMENTO;
+non terminal String EXPR_DECREMENTO;
+
+non terminal ResultadoExpresion OPERANDO;
+
+non terminal String EXPR_POTENCIA;
+non terminal String EXPR_SUMA_RESTA;
+non terminal String EXPR_MULT_DIV;
+non terminal String EXPR_ARITMETICA;
+
+
+/* ==========================================
+   EXPRESIONES RELACIONALES
+   ========================================== */
+
+non terminal String OPERANDO_RELACIONAL;
+non terminal String EXPR_RELACIONAL;
+
+
+/* ==========================================
+   EXPRESIONES LOGICAS
+   ========================================== */
+
+non terminal String OPERANDO_LOGICO;
+non terminal String EXPR_LOGICA;
+non terminal String EXPR_NEGACION_LOGICA;
+non terminal String GRUPO_PARENTESIS;
+
+
+/* ==========================================
+   CONTROL DE FLUJO
+   ========================================== */
+
+non terminal SENTENCIA_IF;
+non terminal SENTENCIA_IF_RESTO;
+non terminal SENTENCIA_ELIF_LISTA;
+non terminal SENTENCIA_ELIF_CABECERA;
+non terminal SENTENCIA_ELSE;
+
+non terminal SENTENCIA_WHILE;
+
+non terminal SENTENCIA_FOR;
+non terminal SENTENCIA_FOR_INIT;
+non terminal SENTENCIA_FOR_INCREMENTO;
+
+
+/* ==========================================
+   ENTRADA Y SALIDA
+   ========================================== */
+
+non terminal SENTENCIA_READ;
+non terminal SENTENCIA_WRITE;
+non terminal OPERANDO_WRITE;
+
+
+/* ==========================================
+   RETURN Y BREAK
+   ========================================== */
+
+non terminal SENTENCIA_RETURN;
+non terminal SENTENCIA_BREAK;
+
+
+/* ==========================================
+   SIMBOLO INICIAL
+   ========================================== */
+
+start with PROGRAMA;
+
+
+/* ==========================================
+   1. ESTRUCTURA DEL PROGRAMA
+   ========================================== */
+
+PROGRAMA ::=
+      FUNCION_MAIN
+    ;
+
+PROGRAMA ::=
+      LISTA_ELEMENTOS FUNCION_MAIN
+    ;
+
+
+LISTA_ELEMENTOS ::=
+      ELEMENTO_PROGRAMA
+    ;
+
+LISTA_ELEMENTOS ::=
+      ELEMENTO_PROGRAMA LISTA_ELEMENTOS
+    ;
+
+
+ELEMENTO_PROGRAMA ::=
+      DECLARACION_GLOBAL
+    ;
+
+ELEMENTO_PROGRAMA ::=
+      DECLARACION_FUNCION
+    ;
+
+ELEMENTO_PROGRAMA ::=
+      error FIN_EXPR
+    ;
+
+
+/* ==========================================
+   2. DECLARACIONES GLOBALES
+   ========================================== */
+
+DECLARACION_GLOBAL ::=
+      DECLARACION_VAR_SIMPLE
+    ;
+
+DECLARACION_GLOBAL ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+DECLARACION_GLOBAL ::=
+      ARREGLO
+    ;
+
+
+/* ==========================================
+   3. FUNCION PRINCIPAL
+   ========================================== */
+
+FUNCION_MAIN ::=
+      VOID PRINCIPAL PAR_INI PAR_FIN
+      {: tablaSimbolos.abrirAmbito("principal"); :}
+      BLOQUE_FUNCION
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+
+/* ==========================================
+   4. TIPOS
+   ========================================== */
+
+TIPO ::=
+      INT    {: RESULT = "int"; :}
+    | FLOAT  {: RESULT = "float"; :}
+    | BOOL   {: RESULT = "bool"; :}
+    | CHAR   {: RESULT = "char"; :}
+    | STRING {: RESULT = "string"; :}
+    ;
+
+TIPO_RETORNO ::=
+      INT   {: RESULT = "int"; :}
+    | FLOAT {: RESULT = "float"; :}
+    | CHAR  {: RESULT = "char"; :}
+    | BOOL  {: RESULT = "bool"; :}
+    ;
+
+
+/* ==========================================
+   5. PARAMETROS
+   ========================================== */
+
+PARAMETRO ::=
+      TIPO:tipo ID:id
+      {:
+          registrarSimbolo(
+              (String) id, tipo, idleft, "parametro"
+          );
+          RESULT = tipo;
+      :}
+    ;
+
+
+PARAMETROS ::=
+      PARAMETRO:p
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(p);
+          RESULT = tipos;
+      :}
+    ;
+
+PARAMETROS ::=
+      PARAMETRO:p COMA PARAMETROS:resto
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(p);
+          tipos.addAll(resto);
+          RESULT = tipos;
+      :}
+    ;
+
+
+/* ==========================================
+   6. FUNCIONES
+   ========================================== */
+
+DECLARACION_FUNCION ::=
+      TIPO_RETORNO:tipo ID:id PAR_INI
+      {:
+          registrarSimbolo(
+              (String) id, tipo, idleft, "funcion"
+          );
+          encontroReturn = false;
+          tablaSimbolos.abrirAmbito("funcion " + id);
+      :}
+      PAR_FIN
+      {:
+          registrarFirmaFuncion(
+              (String) id,
+              new ArrayList<String>(),
+              idleft
+          );
+      :}
+      BLOQUE_FUNCION
+      {:
+          validarReturnObligatorio((String) id, idleft);
+          tablaSimbolos.cerrarAmbito();
+      :}
+    ;
+
+DECLARACION_FUNCION ::=
+      TIPO_RETORNO:tipo ID:id PAR_INI
+      {:
+          registrarSimbolo(
+              (String) id, tipo, idleft, "funcion"
+          );
+          encontroReturn = false;
+          tablaSimbolos.abrirAmbito("funcion " + id);
+      :}
+      PARAMETROS:tipos PAR_FIN
+      {:
+          registrarFirmaFuncion(
+              (String) id, tipos, idleft
+          );
+      :}
+      BLOQUE_FUNCION
+      {:
+          validarReturnObligatorio((String) id, idleft);
+          tablaSimbolos.cerrarAmbito();
+      :}
+    ;
+
+
+/* ==========================================
+   7. ARGUMENTOS
+   ========================================== */
+
+ARGUMENTO ::= EXPRESION:tipo
+      {: RESULT = tipo; :}
+    ;
+
+ARGUMENTOS ::= ARGUMENTO:tipo
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          RESULT = tipos;
+      :}
+    ;
+
+ARGUMENTOS ::= ARGUMENTO:tipo COMA ARGUMENTOS:resto
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          tipos.addAll(resto);
+          RESULT = tipos;
+      :}
+    ;
+
+
+/* ==========================================
+   8. LLAMADA A FUNCION
+   ========================================== */
+
+LLAMADA_FUNCION ::= ID:id PAR_INI PAR_FIN
+      {:
+          RESULT = validarLlamadaFuncion(
+              (String) id, new ArrayList<String>(), idleft
+          );
+      :}
+    ;
+
+LLAMADA_FUNCION ::= ID:id PAR_INI ARGUMENTOS:tipos PAR_FIN
+      {:
+          RESULT = validarLlamadaFuncion(
+              (String) id, tipos, idleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   9. BLOQUES
+   ========================================== */
+
+BLOQUE ::=
+      BLOQUE_INI {: tablaSimbolos.abrirAmbitoBloque(); :}
+      LISTA_SENTENCIAS BLOQUE_FIN
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+/* El ambito del bloque de control se abre desde su sentencia. */
+BLOQUE_CONTROL ::=
+      BLOQUE_INI LISTA_SENTENCIAS BLOQUE_FIN
+    ;
+
+BLOQUE_FUNCION ::=
+      BLOQUE_INI LISTA_SENTENCIAS BLOQUE_FIN
+    ;
+
+
+LISTA_SENTENCIAS ::=
+      /* vacio */
+    ;
+
+LISTA_SENTENCIAS ::=
+      SENTENCIA LISTA_SENTENCIAS
+    ;
+
+
+/* ==========================================
+   10. SENTENCIAS
+   ========================================== */
+
+SENTENCIA ::=
+      DECLARACION_VAR_SIMPLE
+    ;
+
+SENTENCIA ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+SENTENCIA ::=
+      ASIGNACION_VAR
+    ;
+
+SENTENCIA ::=
+      ARREGLO
+    ;
+
+SENTENCIA ::=
+      ASIGNACION_ARREGLO
+    ;
+
+SENTENCIA ::=
+      EXPR_SIN_ASIGNACION
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_RETURN
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_BREAK
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_READ
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_WRITE
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_IF
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_WHILE
+    ;
+
+SENTENCIA ::=
+      SENTENCIA_FOR
+    ;
+
+SENTENCIA ::=
+      BLOQUE
+    ;
+
+
+/* ==========================================
+   RECUPERACION EN MODO PANICO
+   ========================================== */
+
+SENTENCIA ::=
+      error FIN_EXPR
+    ;
+
+
+/* ==========================================
+   11. EXPRESION GENERAL
+   ========================================== */
+
+EXPRESION ::=
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
+    ;
+
+EXPRESION ::=
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
+    ;
+
+EXPRESION ::=
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
+    ;
+
+EXPRESION ::=
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
+    ;
+
+
+//Si el profesor NO permite que estos literales sean usados
+// EXPRESION ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
+//
+// EXPRESION ::=
+//       LIT_CHAR
+//       {: RESULT = "char"; :}
+//     ;
+//
+// EXPRESION ::=
+//       LIT_STRING
+//       {: RESULT = "string"; :}
+//     ;
+//
+
+// OPERANDO_RELACIONAL ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
+//
+// OPERANDO_RELACIONAL ::=
+//       LIT_CHAR
+//       {: RESULT = "char"; :}
+//     ;
+//
+// NOTA: La siguiente producción se eliminó de OPERANDO_LOGICO
+// para evitar conflictos. Si se necesita, descomentarla:
+//
+// OPERANDO_LOGICO ::=
+//       LIT_BOOL
+//       {: RESULT = "bool"; :}
+//     ;
+
+
+/* ==========================================
+   12. EXPRESIONES ARITMETICAS
+   ========================================== */
+
+
+/* ---- Operador negativo ---- */
+
+OP_NEG ::=
+      RESTA
+    ;
+
+
+/* ---- Expresion negativa ---- */
+
+EXPR_NEGATIVO ::=
+      OP_NEG LIT_INT
+      {: RESULT = "int"; :}
+    | OP_NEG LIT_FLOAT
+      {: RESULT = "float"; :}
+    ;
+
+
+/* ---- Incremento ---- */
+
+EXPR_INCREMENTO ::=
+      ID:id INCREMENTO
+      {:
+          RESULT = validarIncrementoDecremento(
+              (String) id, "++", idleft
+          );
+      :}
+    ;
+
+
+/* ---- Decremento ---- */
+
+EXPR_DECREMENTO ::=
+      ID:id DECREMENTO
+      {:
+          RESULT = validarIncrementoDecremento(
+              (String) id, "--", idleft
+          );
+      :}
+    ;
+
+
+/* ---- Operandos ---- */
+
+OPERANDO ::=
+      ID:id
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          RESULT = (simbolo != null)
+              ? crearResultado(simbolo.getTipo(), (String) id)
+              : null;
+      :}
+
+    | LIT_INT:valor
+      {: RESULT = crearResultado("int", (String) valor); :}
+
+    | LIT_FLOAT:valor
+      {: RESULT = crearResultado("float", (String) valor); :}
+
+    // PENDIENTE: Consultar con el profesor si estos literales
+    // deben ser permitidos en operandos aritméticos
+    | LIT_BOOL:valor
+      {: RESULT = crearResultado("bool", (String) valor); :}
+
+    | LIT_STRING:valor
+      {: RESULT = crearResultado("string", (String) valor); :}
+
+    | LIT_CHAR:valor
+      {: RESULT = crearResultado("char", (String) valor); :}
+
+    | ACCESO_ARREGLO:aa
+      {: RESULT = crearResultado(aa, null); :}
+
+    | GRUPO_PARENTESIS:gp
+      {: RESULT = crearResultado(gp, null); :}
+
+    | EXPR_NEGATIVO:en
+      {: RESULT = crearResultado(en, null); :}
+
+    | EXPR_INCREMENTO:ei
+      {: RESULT = crearResultado(ei, null); :}
+
+    | EXPR_DECREMENTO:ed
+      {: RESULT = crearResultado(ed, null); :}
+
+    | LLAMADA_FUNCION:lf
+      {: RESULT = crearResultado(lf, null); :}
+    ;
+
+
+/* ---- Potencia: mayor precedencia ---- */
+
+EXPR_POTENCIA ::=
+      OPERANDO:op
+      {:
+          RESULT = op != null ? op.getTipo() : null;
+      :}
+
+    | OPERANDO:izq POTENCIA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq != null ? izq.getTipo() : null,
+              der,
+              "pot",
+              izqleft
+          );
+      :}
+    ;
+
+
+/* ---- Suma y resta ---- */
+
+EXPR_SUMA_RESTA ::=
+      EXPR_POTENCIA:ep
+      {: RESULT = ep; :}
+
+    | EXPR_SUMA_RESTA:izq SUMA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "+", izqleft
+          );
+      :}
+
+    | EXPR_SUMA_RESTA:izq RESTA EXPR_POTENCIA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "-", izqleft
+          );
+      :}
+    ;
+
+
+/* ---- Multiplicacion y division ---- */
+
+EXPR_MULT_DIV ::=
+      EXPR_SUMA_RESTA:esr
+      {: RESULT = esr; :}
+
+    | EXPR_MULT_DIV:izq MULTIPLICACION EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "*", izqleft
+          );
+      :}
+
+    | EXPR_MULT_DIV:izq DIVISION EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "/", izqleft
+          );
+      :}
+
+    | EXPR_MULT_DIV:izq DIVISION_ENTERA EXPR_SUMA_RESTA:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "//", izqleft
+          );
+      :}
+    ;
+
+
+/* ---- Modulo: menor precedencia ---- */
+
+EXPR_ARITMETICA ::=
+      EXPR_MULT_DIV:emd
+      {: RESULT = emd; :}
+
+    | EXPR_ARITMETICA:izq MODULO EXPR_MULT_DIV:der
+      {:
+          RESULT = validarOperacionAritmetica(
+              izq, der, "mod", izqleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   13. EXPRESIONES RELACIONALES
+   ========================================== */
+
+/* Operandos relacionales generales */
+
+OPERANDO_RELACIONAL ::=
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
+    ;
+
+OPERANDO_RELACIONAL ::=
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
+    ;
+
+/* Menor */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      MENOR
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "<", izqleft
+          );
+      :}
+    ;
+
+/* Menor o igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      MENOR_IGUAL
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "<=", izqleft
+          );
+      :}
+    ;
+
+/* Mayor */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      MAYOR
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, ">", izqleft
+          );
+      :}
+    ;
+
+/* Mayor o igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      MAYOR_IGUAL
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, ">=", izqleft
+          );
+      :}
+    ;
+
+/* Igual */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      IGUAL
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "==", izqleft
+          );
+      :}
+    ;
+
+/* Diferente */
+
+EXPR_RELACIONAL ::=
+      COR_INI OPERANDO_RELACIONAL:izq COR_FIN
+      DIFERENTE
+      COR_INI OPERANDO_RELACIONAL:der COR_FIN
+      {:
+          RESULT = validarOperacionRelacional(
+              izq, der, "!=", izqleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   14. EXPRESIONES LOGICAS
+   ========================================== */
+
+OPERANDO_LOGICO ::=
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_RELACIONAL:er
+      {: RESULT = er; :}
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_NEGACION_LOGICA:enl
+      {: RESULT = enl; :}
+    ;
+
+OPERANDO_LOGICO ::=
+      EXPR_LOGICA:el
+      {: RESULT = el; :}
+    ;
+
+
+GRUPO_PARENTESIS ::=
+      PAR_INI OPERANDO_LOGICO:ol PAR_FIN
+      {: RESULT = ol; :}
+    ;
+
+
+/* ---- AND ---- */
+
+EXPR_LOGICA ::=
+      GRUPO_PARENTESIS:izq
+      AND
+      GRUPO_PARENTESIS:der
+      {:
+          RESULT = validarOperacionLogica(
+              izq, der, "λ", izqleft
+          );
+      :}
+    ;
+
+
+/* ---- OR ---- */
+
+EXPR_LOGICA ::=
+      GRUPO_PARENTESIS:izq
+      OR
+      GRUPO_PARENTESIS:der
+      {:
+          RESULT = validarOperacionLogica(
+              izq, der, "θ", izqleft
+          );
+      :}
+    ;
+
+
+/* ---- NOT ---- */
+
+EXPR_NEGACION_LOGICA ::=
+      NOT GRUPO_PARENTESIS:gp
+      {:
+          RESULT = validarNegacionLogica(
+              gp, gpleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   15. VARIABLES Y ASIGNACIONES
+   ========================================== */
+
+DECLARACION_VAR_SIMPLE ::=
+      VAL TIPO:tipo ID:id FIN_EXPR
+      {: registrarSimbolo((String) id, tipo, idleft, "variable"); :}
+    ;
+
+
+DECLARACION_VAR_ASIGNADA ::=
+      VAL TIPO:tipo ID:id ASIGNACION EXPRESION:expr FIN_EXPR
+      {:
+          registrarSimbolo((String) id, tipo, idleft, "variable");
+          validarTipoAsignacion((String) id, tipo, expr, idleft);
+      :}
+    ;
+
+
+ASIGNACION_VAR ::=
+      ID:id ASIGNACION EXPRESION:expr FIN_EXPR
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          if (simbolo != null) {
+              validarTipoAsignacion(
+                  (String) id,
+                  simbolo.getTipo(),
+                  expr,
+                  idleft
+              );
+          }
+      :}
+    ;
+
+
+ASIGNACION_VAR_SIN_FIN ::=
+      ID:id ASIGNACION EXPRESION:expr
+      {:
+          validarIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          if (simbolo != null) {
+              validarTipoAsignacion(
+                  (String) id,
+                  simbolo.getTipo(),
+                  expr,
+                  idleft
+              );
+          }
+      :}
+    ;
+
+
+EXPR_SIN_ASIGNACION ::=
+      EXPRESION FIN_EXPR
+    ;
+
+
+/* ==========================================
+   16. ARREGLOS
+   ========================================== */
+
+LISTA_EXPRESIONES ::=
+      EXPRESION:tipo
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          RESULT = tipos;
+      :}
+
+    | EXPRESION:tipo COMA LISTA_EXPRESIONES:resto
+      {:
+          List<String> tipos = new ArrayList<>();
+          tipos.add(tipo);
+          tipos.addAll(resto);
+          RESULT = tipos;
+      :}
+    ;
+
+TAMANO_ARREGLO ::=
+      LIT_INT:n
+      {:
+          RESULT = Integer.valueOf(n.toString());
+      :}
+    ;
+
+ARREGLO ::=
+      VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
+      ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
+      {:
+          registrarArreglo((String) id, tipo, tamano, null, idleft);
+      :}
+
+    | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
+      ASIGNACION BLOQUE_INI LISTA_EXPRESIONES:elementos BLOQUE_FIN FIN_EXPR
+      {:
+          registrarArreglo((String) id, tipo, tamano, elementos, idleft);
+      :}
+
+    | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN FIN_EXPR
+      {:
+          registrarArreglo((String) id, tipo, tamano, null, idleft);
+      :}
+    ;
+
+
+/* ==========================================
+   17. ACCESO A ARREGLOS
+   ========================================== */
+
+INDICE ::=
+      EXPR_ARITMETICA:ea
+      {: RESULT = ea; :}
+    ;
+
+
+ACCESO_ARREGLO ::=
+      ID:id COR_INI INDICE:tipoIndice COR_FIN
+      {:
+          RESULT = validarAccesoArreglo(
+              (String) id, tipoIndice, idleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   18. ASIGNACION DE ARREGLOS
+   ========================================== */
+
+ASIGNACION_ARREGLO ::=
+      ACCESO_ARREGLO:tipoElemento
+      ASIGNACION EXPRESION:tipoValor FIN_EXPR
+      {:
+          validarAsignacionArreglo(
+              tipoElemento, tipoValor, tipoElementoleft
+          );
+      :}
+    ;
+
+
+/* ==========================================
+   19. ENTRADA
+   ========================================== */
+
+SENTENCIA_READ ::=
+      READ PAR_INI ID:id PAR_FIN FIN_EXPR
+      {:
+          validarRead((String) id, idleft);
+      :}
+    ;
+
+
+/* ==========================================
+   20. SALIDA
+   ========================================== */
+
+OPERANDO_WRITE ::=
+      ID:id
+      {:
+          validarWriteIdentificador((String) id, idleft);
+      :}
+    | LIT_INT
+    | LIT_FLOAT
+    | LIT_BOOL
+    | LIT_STRING
+    ;
+
+
+SENTENCIA_WRITE ::=
+      WRITE PAR_INI OPERANDO_WRITE PAR_FIN FIN_EXPR
+    ;
+
+
+/* ==========================================
+   21. RETURN Y BREAK
+   ========================================== */
+
+SENTENCIA_RETURN ::=
+      RETURN:r EXPRESION:tipo FIN_EXPR
+      {:
+          validarReturn(tipo, rleft);
+      :}
+    ;
+
+
+SENTENCIA_BREAK ::=
+      BREAK:b FIN_EXPR
+      {:
+          validarBreak(bleft);
+      :}
+    ;
+
+
+/* ==========================================
+   22. IF - ELIF - ELSE
+   ========================================== */
+
+SENTENCIA_IF ::=
+      IF PAR_INI EXPRESION:cond PAR_FIN
+      {: abrirAmbitoEstructura("if"); :}
+      BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+      SENTENCIA_IF_RESTO
+      {:
+          validarCondicion(cond, "if", condleft);
+      :}
+    ;
+
+SENTENCIA_IF_RESTO ::=
+      /* vacio */
+    | SENTENCIA_ELIF_LISTA
+    | SENTENCIA_ELSE
+    | SENTENCIA_ELIF_LISTA SENTENCIA_ELSE
+    ;
+
+SENTENCIA_ELSE ::=
+      ELSE {: abrirAmbitoEstructura("else"); :}
+      BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+    ;
+
+SENTENCIA_ELIF_CABECERA ::=
+      ELIF PAR_INI EXPRESION:cond PAR_FIN
+      {:
+          validarCondicion(cond, "elif", condleft);
+          abrirAmbitoEstructura("elif");
+      :}
+    ;
+
+SENTENCIA_ELIF_LISTA ::=
+      SENTENCIA_ELIF_CABECERA BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+    | SENTENCIA_ELIF_CABECERA BLOQUE_CONTROL
+      {: tablaSimbolos.cerrarAmbito(); :}
+      SENTENCIA_ELIF_LISTA
+    ;
+
+/* ==========================================
+   23. WHILE
+   ========================================== */
+
+SENTENCIA_WHILE ::=
+      WHILE PAR_INI EXPRESION:cond PAR_FIN
+      {:
+          abrirAmbitoEstructura("while");
+      :}
+      BLOQUE_CONTROL
+      {:
+          tablaSimbolos.cerrarAmbito();
+          validarCondicion(cond, "while", condleft);
+      :}
+    ;
+
+
+/* ==========================================
+   24. FOR
+   ========================================== */
+
+SENTENCIA_FOR_INIT ::=
+      DECLARACION_VAR_ASIGNADA
+    ;
+
+SENTENCIA_FOR_INIT ::=
+      ASIGNACION_VAR
+    ;
+
+
+SENTENCIA_FOR_INCREMENTO ::=
+      EXPR_INCREMENTO
+    ;
+
+SENTENCIA_FOR_INCREMENTO ::=
+      EXPR_DECREMENTO
+    ;
+
+SENTENCIA_FOR_INCREMENTO ::=
+      ASIGNACION_VAR_SIN_FIN
+    ;
+
+
+SENTENCIA_FOR ::=
+      FOR PAR_INI
+      {:
+          abrirAmbitoEstructura("for");
+      :}
+      SENTENCIA_FOR_INIT
+      EXPRESION:cond FIN_EXPR
+      SENTENCIA_FOR_INCREMENTO PAR_FIN
+      {:
+          tablaSimbolos.abrirAmbito("Cuerpo");
+      :}
+      BLOQUE_CONTROL
+      {:
+          tablaSimbolos.cerrarAmbito(); // Cuerpo
+          validarCondicion(cond, "for", condleft);
+          tablaSimbolos.cerrarAmbito(); // for
+      :}
+    ;
