@@ -1718,7 +1718,10 @@ EXPR_NEGACION_LOGICA ::=
 
 DECLARACION_VAR_SIMPLE ::=
       VAL TIPO:tipo ID:id FIN_EXPR
-      {: registrarSimbolo((String) id, tipo, idleft, "variable"); :}
+      {:
+          registrarSimbolo((String) id, tipo, idleft, "variable");
+          generador.generarDeclaracion(tipo, (String) id);
+      :}
     ;
 
 
@@ -1732,6 +1735,11 @@ DECLARACION_VAR_ASIGNADA ::=
               obtenerTipo(expr),
               idleft
           );
+
+          if (tipo.equals(obtenerTipo(expr))) {
+              generador.generarDeclaracion(tipo, (String) id);
+              generador.generarAsignacionInicial((String) id, expr);
+          }
       :}
     ;
 
@@ -1751,6 +1759,12 @@ ASIGNACION_VAR ::=
                   obtenerTipo(expr),
                   idleft
               );
+
+              if (simbolo.getTipo().equals(obtenerTipo(expr))) {
+                  generador.generarAsignacionInicial(
+                      (String) id, expr
+                  );
+              }
           }
       :}
     ;
