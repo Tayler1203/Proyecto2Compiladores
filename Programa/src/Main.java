@@ -41,7 +41,8 @@ public class Main {
             rutaEntrada,
             rutaErroresSintacticos,
             rutaErroresSemanticos,
-            rutaTablaSimbolos
+            rutaTablaSimbolos,
+            rutaCodigoIntermedio
         );
 
         boolean aceptado = !huboErroresLexicos && !huboErroresSintacticos;
@@ -191,13 +192,15 @@ public class Main {
      * @param rutaErroresSintacticos Ruta del archivo de errores sintacticos.
      * @param rutaErroresSemanticos Ruta del archivo de errores semanticos.
      * @param rutaTablaSimbolos Ruta del archivo de salida para la tabla de simbolos.
+     * @param rutaCodigoIntermedio Ruta del archivo de salida para el codigo intermedio.
      * @return true si hubo errores sintacticos o si el analisis se interrumpio; false en caso contrario.
      */
     private static boolean analizarSintactico(
         String rutaEntrada,
         String rutaErroresSintacticos,
         String rutaErroresSemanticos,
-        String rutaTablaSimbolos
+        String rutaTablaSimbolos,
+        String rutaCodigoIntermedio
     ) {
 
         Parser parser = null;
@@ -300,7 +303,6 @@ public class Main {
 
         if (parser != null) {
             try {
-                String rutaCodigoIntermedio = "salida/codigo_intermedio.txt";
                 parser.getGenerador().guardar(rutaCodigoIntermedio);
                 System.out.println(
                     "Codigo intermedio guardado en: "

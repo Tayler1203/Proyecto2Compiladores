@@ -8,6 +8,13 @@ parser code {:
 
     private final TablaSimbolos tablaSimbolos = new TablaSimbolos();
 
+    private final GeneradorCodigoIntermedio generador =
+        new GeneradorCodigoIntermedio();
+
+    public GeneradorCodigoIntermedio getGenerador() {
+        return generador;
+    }
+
     public List<String> erroresSemanticos = new ArrayList<>();
 
     private final java.util.Map<String, Integer> contadoresAmbitos = new java.util.HashMap<>();
@@ -619,6 +626,17 @@ parser code {:
         return tipo;
     }
 
+    private ResultadoExpresion crearResultado(
+        String tipo,
+        String lugar
+    ) {
+        if (tipo == null) {
+            return null;
+        }
+
+        return new ResultadoExpresion(tipo, lugar);
+    }
+
     public boolean huboErrorSemantico() {
         return !erroresSemanticos.isEmpty();
     }
@@ -800,7 +818,7 @@ non terminal String EXPR_NEGATIVO;
 non terminal String EXPR_INCREMENTO;
 non terminal String EXPR_DECREMENTO;
 
-non terminal String OPERANDO;
+non terminal ResultadoExpresion OPERANDO;
 
 non terminal String EXPR_POTENCIA;
 non terminal String EXPR_SUMA_RESTA;
@@ -1301,44 +1319,44 @@ OPERANDO ::=
               tablaSimbolos.buscarSimbolo((String) id);
 
           RESULT = (simbolo != null)
-              ? simbolo.getTipo()
+              ? crearResultado(simbolo.getTipo(), (String) id)
               : null;
       :}
 
-    | LIT_INT
-      {: RESULT = "int"; :}
+    | LIT_INT:valor
+      {: RESULT = crearResultado("int", (String) valor); :}
 
-    | LIT_FLOAT
-      {: RESULT = "float"; :}
+    | LIT_FLOAT:valor
+      {: RESULT = crearResultado("float", (String) valor); :}
 
     // PENDIENTE: Consultar con el profesor si estos literales
     // deben ser permitidos en operandos aritméticos
-    | LIT_BOOL
-      {: RESULT = "bool"; :}
+    | LIT_BOOL:valor
+      {: RESULT = crearResultado("bool", (String) valor); :}
 
-    | LIT_STRING
-      {: RESULT = "string"; :}
+    | LIT_STRING:valor
+      {: RESULT = crearResultado("string", (String) valor); :}
 
-    | LIT_CHAR
-      {: RESULT = "char"; :}
+    | LIT_CHAR:valor
+      {: RESULT = crearResultado("char", (String) valor); :}
 
     | ACCESO_ARREGLO:aa
-      {: RESULT = aa; :}
+      {: RESULT = crearResultado(aa, null); :}
 
     | GRUPO_PARENTESIS:gp
-      {: RESULT = gp; :}
+      {: RESULT = crearResultado(gp, null); :}
 
     | EXPR_NEGATIVO:en
-      {: RESULT = en; :}
+      {: RESULT = crearResultado(en, null); :}
 
     | EXPR_INCREMENTO:ei
-      {: RESULT = ei; :}
+      {: RESULT = crearResultado(ei, null); :}
 
     | EXPR_DECREMENTO:ed
-      {: RESULT = ed; :}
+      {: RESULT = crearResultado(ed, null); :}
 
     | LLAMADA_FUNCION:lf
-      {: RESULT = lf; :}
+      {: RESULT = crearResultado(lf, null); :}
     ;
 
 
@@ -1346,12 +1364,17 @@ OPERANDO ::=
 
 EXPR_POTENCIA ::=
       OPERANDO:op
-      {: RESULT = op; :}
+      {:
+          RESULT = op != null ? op.getTipo() : null;
+      :}
 
     | OPERANDO:izq POTENCIA EXPR_POTENCIA:der
       {:
           RESULT = validarOperacionAritmetica(
-              izq, der, "pot", izqleft
+              izq != null ? izq.getTipo() : null,
+              der,
+              "pot",
+              izqleft
           );
       :}
     ;
