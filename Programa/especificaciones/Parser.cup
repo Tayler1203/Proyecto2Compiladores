@@ -1944,12 +1944,16 @@ SENTENCIA_BREAK ::=
 
 SENTENCIA_IF ::=
       IF PAR_INI EXPRESION:cond PAR_FIN
-      {: abrirAmbitoEstructura("if"); :}
+      {:
+          validarCondicion(obtenerTipo(cond), "if", condleft);
+          generador.iniciarIf(cond);
+          abrirAmbitoEstructura("if");
+      :}
       BLOQUE_CONTROL
       {: tablaSimbolos.cerrarAmbito(); :}
       SENTENCIA_IF_RESTO
       {:
-          validarCondicion(obtenerTipo(cond), "if", condleft);
+          generador.terminarIf();
       :}
     ;
 
@@ -1961,15 +1965,21 @@ SENTENCIA_IF_RESTO ::=
     ;
 
 SENTENCIA_ELSE ::=
-      ELSE {: abrirAmbitoEstructura("else"); :}
+      ELSE
+      {:
+          generador.iniciarElse();
+          abrirAmbitoEstructura("else");
+      :}
       BLOQUE_CONTROL
       {: tablaSimbolos.cerrarAmbito(); :}
     ;
 
 SENTENCIA_ELIF_CABECERA ::=
-      ELIF PAR_INI EXPRESION:cond PAR_FIN
+      ELIF {: generador.iniciarElif(); :}
+      PAR_INI EXPRESION:cond PAR_FIN
       {:
           validarCondicion(obtenerTipo(cond), "elif", condleft);
+          generador.evaluarElif(cond);
           abrirAmbitoEstructura("elif");
       :}
     ;

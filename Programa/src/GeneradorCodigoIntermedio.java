@@ -3,15 +3,29 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 public class GeneradorCodigoIntermedio {
+
+  private static class ContextoIf {
+    private final String etiquetaFin;
+    private String etiquetaFalsa;
+    private boolean tieneSaltoAFin;
+
+    private ContextoIf(String etiquetaFin, String etiquetaFalsa) {
+      this.etiquetaFin = etiquetaFin;
+      this.etiquetaFalsa = etiquetaFalsa;
+    }
+  }
 
   private int contadorTemporales = 0;
   private int contadorEtiquetas = 0;
 
   private final List<String> instrucciones = new ArrayList<>();
+  private final Deque<ContextoIf> contextosIf = new ArrayDeque<>();
 
   public ResultadoExpresion crearResultado(String tipo, String lugar) {
     return tipo == null ? null : new ResultadoExpresion(tipo, lugar);
@@ -123,6 +137,76 @@ public class GeneradorCodigoIntermedio {
     return "L" + contadorEtiquetas++;
   }
 
+  public void iniciarIf(ResultadoExpresion condicion) {
+    ContextoIf contexto = new ContextoIf(
+        nuevaEtiqueta(),
+        nuevaEtiqueta()
+    );
+    contextosIf.push(contexto);
+    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFalsa);
+  }
+
+  public void iniciarElif() {
+    ContextoIf contexto = obtenerContextoIf();
+    emitir("goto " + contexto.etiquetaFin);
+    emitirEtiqueta(contexto.etiquetaFalsa);
+    contexto.etiquetaFalsa = nuevaEtiqueta();
+    contexto.tieneSaltoAFin = true;
+  }
+
+  public void evaluarElif(ResultadoExpresion condicion) {
+    ContextoIf contexto = obtenerContextoIf();
+    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFalsa);
+  }
+
+  public void iniciarElse() {
+    ContextoIf contexto = obtenerContextoIf();
+    emitir("goto " + contexto.etiquetaFin);
+    emitirEtiqueta(contexto.etiquetaFalsa);
+    contexto.etiquetaFalsa = null;
+    contexto.tieneSaltoAFin = true;
+  }
+
+  public void terminarIf() {
+    ContextoIf contexto = obtenerContextoIf();
+
+    if (contexto.etiquetaFalsa != null) {
+      emitirEtiqueta(contexto.etiquetaFalsa);
+    }
+
+    if (contexto.tieneSaltoAFin) {
+      emitirEtiqueta(contexto.etiquetaFin);
+    }
+
+    contextosIf.pop();
+  }
+
+  private void emitirSaltoCondicionalFalso(
+      ResultadoExpresion condicion,
+      String etiquetaFalsa
+  ) {
+    if (condicion != null
+        && "bool".equals(condicion.getTipo())
+        && condicion.getLugar() != null) {
+      emitir(
+          "ifFalse " + condicion.getLugar()
+          + " goto " + etiquetaFalsa
+      );
+    } else {
+      emitir("goto " + etiquetaFalsa);
+    }
+  }
+
+  private ContextoIf obtenerContextoIf() {
+    if (contextosIf.isEmpty()) {
+      throw new IllegalStateException(
+          "No hay un contexto if activo para generar codigo intermedio."
+      );
+    }
+
+    return contextosIf.peek();
+  }
+
   public void emitir(String instruccion) {
     instrucciones.add(instruccion);
   }
@@ -171,5 +255,6 @@ public class GeneradorCodigoIntermedio {
     contadorTemporales = 0;
     contadorEtiquetas = 0;
     instrucciones.clear();
+    contextosIf.clear();
   }
 }
