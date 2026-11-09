@@ -120,14 +120,7 @@ public class GeneradorCodigoIntermedio {
     }
     List<String> lugaresArgumentos = new ArrayList<>();
     for (ResultadoExpresion argumento : argumentos) {
-      String lugar = argumento.getLugar();
-
-      if (lugar.equals("true")
-          || lugar.equals("false")
-          || lugar.startsWith("\"")
-          || lugar.matches("-?[0-9]+(\\.[0-9]+)?")) {
-        lugar = generarLiteral(lugar);
-      }
+      String lugar = obtenerLugarOperando(argumento.getLugar());
 
       lugaresArgumentos.add(lugar);
     }
@@ -155,15 +148,19 @@ public class GeneradorCodigoIntermedio {
       ResultadoExpresion indice,
       String tipo
   ) {
-    if (tipo == null || indice == null) {
+    if (tipo == null || indice == null
+        || indice.getLugar() == null) {
       return null;
     }
 
-    String lugar = indice.getLugar() == null
-        ? null
-        : nombre + "ʃ:" + indice.getLugar() + ":ʅ";
+    String temporal = nuevoTemporal();
 
-    return crearResultado(tipo, lugar);
+    emitir(
+        temporal + " = " + nombre
+        + "[" + indice.getLugar() + "]"
+    );
+
+    return crearResultado(tipo, temporal);
   }
 
   public String nuevoTemporal() {
@@ -174,6 +171,25 @@ public class GeneradorCodigoIntermedio {
     String temporal = nuevoTemporal();
     emitir(temporal + " = " + valor);
     return temporal;
+  }
+
+  private boolean esLiteral(String lugar) {
+    if (lugar == null) {
+      return false;
+    }
+
+    return lugar.equals("true")
+        || lugar.equals("false")
+        || lugar.startsWith("\"")
+        || lugar.matches("-?[0-9]+(\\.[0-9]+)?");
+  }
+
+  private String obtenerLugarOperando(String lugar) {
+    if (esLiteral(lugar)) {
+      return generarLiteral(lugar);
+    }
+
+    return lugar;
   }
 
   public String nuevaEtiqueta() {
@@ -410,6 +426,52 @@ public class GeneradorCodigoIntermedio {
     emitir("data_" + tipo + " " + nombre);
   }
 
+  public void generarDeclaracionArreglo(
+      String tipo,
+      String nombre,
+      int tamanio
+  ) {
+    emitir("data_" + tipo + " " + nombre + "[" + tamanio + "]");
+  }
+
+  public void generarInicializacionArreglo(
+      String nombre,
+      List<ResultadoExpresion> elementos
+  ) {
+    if (elementos == null) {
+      return;
+    }
+
+    for (int i = 0; i < elementos.size(); i++) {
+      ResultadoExpresion elemento = elementos.get(i);
+
+      if (elemento == null || elemento.getLugar() == null) {
+        continue;
+      }
+
+      String lugar = obtenerLugarOperando(elemento.getLugar());
+
+      emitir(nombre + "[" + i + "] = " + lugar);
+    }
+  }
+
+  public void generarAsignacionElementoArreglo(
+      String nombre,
+      ResultadoExpresion indice,
+      ResultadoExpresion valor
+  ) {
+    if (indice == null || valor == null
+        || indice.getLugar() == null
+        || valor.getLugar() == null) {
+      return;
+    }
+
+    String lugarIndice = indice.getLugar();
+    String lugarValor = obtenerLugarOperando(valor.getLugar());
+
+    emitir(nombre + "[" + lugarIndice + "] = " + lugarValor);
+  }
+
   public void generarRead(String identificador) {
     emitir("read " + identificador);
   }
@@ -418,14 +480,7 @@ public class GeneradorCodigoIntermedio {
     if (expresion == null || expresion.getLugar() == null) {
       return;
     }
-    String lugar = expresion.getLugar();
-
-    if (lugar.equals("true")
-        || lugar.equals("false")
-        || lugar.startsWith("\"")
-        || lugar.matches("-?[0-9]+(\\.[0-9]+)?")) {
-      lugar = generarLiteral(lugar);
-    }
+    String lugar = obtenerLugarOperando(expresion.getLugar());
 
     emitir("write " + lugar);
   }
@@ -464,14 +519,7 @@ public class GeneradorCodigoIntermedio {
       return;
     }
 
-    String lugar = expresion.getLugar();
-
-    if (lugar.equals("true")
-        || lugar.equals("false")
-        || lugar.startsWith("\"")
-        || lugar.matches("-?[0-9]+(\\.[0-9]+)?")) {
-      lugar = generarLiteral(lugar);
-    }
+    String lugar = obtenerLugarOperando(expresion.getLugar());
 
     generarAsignacion(nombre, lugar);
   }
