@@ -957,7 +957,7 @@ non terminal SENTENCIA_FOR_INCREMENTO;
 
 non terminal SENTENCIA_READ;
 non terminal SENTENCIA_WRITE;
-non terminal OPERANDO_WRITE;
+non terminal ResultadoExpresion OPERANDO_WRITE;
 
 
 /* ==========================================
@@ -1917,6 +1917,7 @@ SENTENCIA_READ ::=
       READ PAR_INI ID:id PAR_FIN FIN_EXPR
       {:
           validarRead((String) id, idleft);
+          generador.generarRead((String) id);
       :}
     ;
 
@@ -1929,16 +1930,52 @@ OPERANDO_WRITE ::=
       ID:id
       {:
           validarWriteIdentificador((String) id, idleft);
+
+          TablaSimbolos.Simbolo simbolo =
+              tablaSimbolos.buscarSimbolo((String) id);
+
+          RESULT = (simbolo != null)
+              ? generador.crearResultado(
+                  simbolo.getTipo(), (String) id
+              )
+              : null;
       :}
-    | LIT_INT
-    | LIT_FLOAT
-    | LIT_BOOL
-    | LIT_STRING
+
+    | LIT_INT:valor
+      {:
+          RESULT = generador.crearResultado(
+              "int", (String) valor
+          );
+      :}
+
+    | LIT_FLOAT:valor
+      {:
+          RESULT = generador.crearResultado(
+              "float", (String) valor
+          );
+      :}
+
+    | LIT_BOOL:valor
+      {:
+          RESULT = generador.crearResultado(
+              "bool", (String) valor
+          );
+      :}
+
+    | LIT_STRING:valor
+      {:
+          RESULT = generador.crearResultado(
+              "string", (String) valor
+          );
+      :}
     ;
 
 
 SENTENCIA_WRITE ::=
-      WRITE PAR_INI OPERANDO_WRITE PAR_FIN FIN_EXPR
+      WRITE PAR_INI OPERANDO_WRITE:valor PAR_FIN FIN_EXPR
+      {:
+          generador.generarWrite(valor);
+      :}
     ;
 
 

@@ -410,6 +410,26 @@ public class GeneradorCodigoIntermedio {
     emitir("data_" + tipo + " " + nombre);
   }
 
+  public void generarRead(String identificador) {
+    emitir("read " + identificador);
+  }
+
+  public void generarWrite(ResultadoExpresion expresion) {
+    if (expresion == null || expresion.getLugar() == null) {
+      return;
+    }
+    String lugar = expresion.getLugar();
+
+    if (lugar.equals("true")
+        || lugar.equals("false")
+        || lugar.startsWith("\"")
+        || lugar.matches("-?[0-9]+(\\.[0-9]+)?")) {
+      lugar = generarLiteral(lugar);
+    }
+
+    emitir("write " + lugar);
+  }
+
   public void registrarParametro(String tipo, String nombre) {
     parametrosPendientes.addLast("param_" + tipo + " " + nombre);
   }
