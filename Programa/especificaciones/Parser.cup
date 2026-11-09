@@ -2004,14 +2004,30 @@ SENTENCIA_ELIF_LISTA ::=
    ========================================== */
 
 SENTENCIA_WHILE ::=
-      WHILE PAR_INI EXPRESION:cond PAR_FIN
+      WHILE PAR_INI
       {:
+          String funcion =
+              tablaSimbolos.obtenerNombreFuncionActual();
+
+          if (funcion == null) {
+              funcion = "global";
+          }
+
+          generador.comenzarWhile(funcion);
+      :}
+      EXPRESION:cond PAR_FIN
+      {:
+          validarCondicion(
+              obtenerTipo(cond), "while", condleft
+          );
+
+          generador.evaluarWhile(cond);
           abrirAmbitoEstructura("while");
       :}
       BLOQUE_CONTROL
       {:
           tablaSimbolos.cerrarAmbito();
-          validarCondicion(obtenerTipo(cond), "while", condleft);
+          generador.terminarWhile();
       :}
     ;
 

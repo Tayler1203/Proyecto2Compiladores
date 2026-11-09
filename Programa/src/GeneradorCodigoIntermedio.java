@@ -32,12 +32,21 @@ public class GeneradorCodigoIntermedio {
     }
   }
 
+  private static class ContextoWhile {
+    private final String base;
+
+    private ContextoWhile(String base) {
+      this.base = base;
+    }
+  }
+
   private int contadorTemporales = 0;
   private int contadorEtiquetas = 0;
 
   private final List<String> instrucciones = new ArrayList<>();
   private final Deque<ContextoIf> contextosIf = new ArrayDeque<>();
   private final Deque<ContextoFor> contextosFor = new ArrayDeque<>();
+  private final Deque<ContextoWhile> contextosWhile = new ArrayDeque<>();
   private List<String> instruccionesDiferidas;
 
   public ResultadoExpresion crearResultado(String tipo, String lugar) {
@@ -230,6 +239,38 @@ public class GeneradorCodigoIntermedio {
     contextosFor.pop();
   }
 
+  public void comenzarWhile(String funcion) {
+    String base = funcion + "_while_" + contadorEtiquetas++;
+
+    ContextoWhile contexto = new ContextoWhile(base);
+    contextosWhile.push(contexto);
+
+    emitirEtiqueta(base + "_inicio");
+  }
+
+  public void evaluarWhile(ResultadoExpresion condicion) {
+    ContextoWhile contexto = contextosWhile.peek();
+
+    if (condicion != null
+        && "bool".equals(condicion.getTipo())
+        && condicion.getLugar() != null) {
+      emitir(
+          "if " + condicion.getLugar()
+          + " goto " + contexto.base + "_bloque"
+      );
+    }
+
+    emitir("goto " + contexto.base + "_fin");
+    emitirEtiqueta(contexto.base + "_bloque");
+  }
+
+  public void terminarWhile() {
+    ContextoWhile contexto = contextosWhile.pop();
+
+    emitir("goto " + contexto.base + "_inicio");
+    emitirEtiqueta(contexto.base + "_fin");
+  }
+
   private void emitirSaltoCondicionalFalso(
       ResultadoExpresion condicion,
       String etiquetaFalsa
@@ -331,6 +372,7 @@ public class GeneradorCodigoIntermedio {
     instrucciones.clear();
     contextosIf.clear();
     contextosFor.clear();
+    contextosWhile.clear();
     instruccionesDiferidas = null;
   }
 }
