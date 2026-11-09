@@ -108,33 +108,45 @@ public class GeneradorCodigoIntermedio {
       List<ResultadoExpresion> argumentos,
       String tipo
   ) {
-    if (tipo == null) {
+    if (tipo == null || argumentos == null) {
       return null;
     }
 
-    StringBuilder lugar = new StringBuilder(nombre + "є:");
-    boolean lugaresCompletos = true;
-
-    for (int i = 0; i < argumentos.size(); i++) {
-      ResultadoExpresion argumento = argumentos.get(i);
-
+    for (ResultadoExpresion argumento : argumentos) {
       if (argumento == null || argumento.getLugar() == null) {
-        lugaresCompletos = false;
-      } else {
-        if (i > 0) {
-          lugar.append(", ");
-        }
-
-        lugar.append(argumento.getLugar());
+        return null;
       }
     }
+    List<String> lugaresArgumentos = new ArrayList<>();
+    for (ResultadoExpresion argumento : argumentos) {
+      String lugar = argumento.getLugar();
 
-    lugar.append(":э");
+      if (lugar.equals("true")
+          || lugar.equals("false")
+          || lugar.startsWith("\"")
+          || lugar.matches("-?[0-9]+(\\.[0-9]+)?")) {
+        lugar = generarLiteral(lugar);
+      }
 
-    return crearResultado(
-        tipo,
-        lugaresCompletos ? lugar.toString() : null
+      lugaresArgumentos.add(lugar);
+    }
+
+    for (String lugar : lugaresArgumentos) {
+      emitir("param " + lugar);
+    }
+
+    if ("void".equals(tipo)) {
+      emitir("call " + nombre + ", " + argumentos.size());
+      return crearResultado(tipo, null);
+    }
+
+    String temporalResultado = nuevoTemporal();
+
+    emitir(
+        temporalResultado + " = call " + nombre + ", " + argumentos.size()
     );
+
+    return crearResultado(tipo, temporalResultado);
   }
 
   public ResultadoExpresion crearAccesoArreglo(
