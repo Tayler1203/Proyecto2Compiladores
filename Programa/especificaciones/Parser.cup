@@ -623,6 +623,7 @@ parser code {:
             return null;
         }
 
+        generador.generarIncrementoDecremento(nombre, operador);
         return tipo;
     }
 
@@ -1785,6 +1786,12 @@ ASIGNACION_VAR_SIN_FIN ::=
                   obtenerTipo(expr),
                   idleft
               );
+
+              if (simbolo.getTipo().equals(obtenerTipo(expr))) {
+                  generador.generarAsignacionInicial(
+                      (String) id, expr
+                  );
+              }
           }
       :}
     ;
@@ -2041,15 +2048,25 @@ SENTENCIA_FOR ::=
           abrirAmbitoEstructura("for");
       :}
       SENTENCIA_FOR_INIT
+      {:
+          generador.iniciarFor();
+      :}
       EXPRESION:cond FIN_EXPR
+      {:
+          validarCondicion(obtenerTipo(cond), "for", condleft);
+          generador.evaluarCondicionFor(cond);
+      :}
       SENTENCIA_FOR_INCREMENTO PAR_FIN
+      {:
+          generador.finalizarEncabezadoFor();
+      :}
       {:
           tablaSimbolos.abrirAmbito("Cuerpo");
       :}
       BLOQUE_CONTROL
       {:
           tablaSimbolos.cerrarAmbito(); // Cuerpo
-          validarCondicion(obtenerTipo(cond), "for", condleft);
           tablaSimbolos.cerrarAmbito(); // for
+          generador.terminarFor();
       :}
     ;

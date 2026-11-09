@@ -21,11 +21,24 @@ public class GeneradorCodigoIntermedio {
     }
   }
 
+  private static class ContextoFor {
+    private final String etiquetaCondicion;
+    private final String etiquetaFin;
+    private List<String> instruccionesIncremento = new ArrayList<>();
+
+    private ContextoFor(String etiquetaCondicion, String etiquetaFin) {
+      this.etiquetaCondicion = etiquetaCondicion;
+      this.etiquetaFin = etiquetaFin;
+    }
+  }
+
   private int contadorTemporales = 0;
   private int contadorEtiquetas = 0;
 
   private final List<String> instrucciones = new ArrayList<>();
   private final Deque<ContextoIf> contextosIf = new ArrayDeque<>();
+  private final Deque<ContextoFor> contextosFor = new ArrayDeque<>();
+  private List<String> instruccionesDiferidas;
 
   public ResultadoExpresion crearResultado(String tipo, String lugar) {
     return tipo == null ? null : new ResultadoExpresion(tipo, lugar);
@@ -181,6 +194,42 @@ public class GeneradorCodigoIntermedio {
     contextosIf.pop();
   }
 
+  public void iniciarFor() {
+    ContextoFor contexto = new ContextoFor(
+        nuevaEtiqueta(),
+        nuevaEtiqueta()
+    );
+    contextosFor.push(contexto);
+    emitirEtiqueta(contexto.etiquetaCondicion);
+  }
+
+  public void evaluarCondicionFor(ResultadoExpresion condicion) {
+    ContextoFor contexto = obtenerContextoFor();
+    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFin);
+    instruccionesDiferidas = new ArrayList<>();
+  }
+
+  public void finalizarEncabezadoFor() {
+    ContextoFor contexto = obtenerContextoFor();
+
+    if (instruccionesDiferidas == null) {
+      throw new IllegalStateException(
+          "No hay instrucciones de incremento pendientes para el for."
+      );
+    }
+
+    contexto.instruccionesIncremento = instruccionesDiferidas;
+    instruccionesDiferidas = null;
+  }
+
+  public void terminarFor() {
+    ContextoFor contexto = obtenerContextoFor();
+    instrucciones.addAll(contexto.instruccionesIncremento);
+    emitir("goto " + contexto.etiquetaCondicion);
+    emitirEtiqueta(contexto.etiquetaFin);
+    contextosFor.pop();
+  }
+
   private void emitirSaltoCondicionalFalso(
       ResultadoExpresion condicion,
       String etiquetaFalsa
@@ -207,8 +256,22 @@ public class GeneradorCodigoIntermedio {
     return contextosIf.peek();
   }
 
+  private ContextoFor obtenerContextoFor() {
+    if (contextosFor.isEmpty()) {
+      throw new IllegalStateException(
+          "No hay un contexto for activo para generar codigo intermedio."
+      );
+    }
+
+    return contextosFor.peek();
+  }
+
   public void emitir(String instruccion) {
-    instrucciones.add(instruccion);
+    if (instruccionesDiferidas == null) {
+      instrucciones.add(instruccion);
+    } else {
+      instruccionesDiferidas.add(instruccion);
+    }
   }
 
   public void emitirEtiqueta(String etiqueta) {
@@ -217,6 +280,17 @@ public class GeneradorCodigoIntermedio {
 
   public void generarAsignacion(String identificador, String lugar) {
     emitir(identificador + " = " + lugar);
+  }
+
+  public void generarIncrementoDecremento(
+      String identificador,
+      String operador
+  ) {
+    String operadorAritmetico = "++".equals(operador) ? "+" : "-";
+    String temporal = nuevoTemporal();
+    emitir(temporal + " = " + identificador + " "
+        + operadorAritmetico + " 1");
+    generarAsignacion(identificador, temporal);
   }
 
   public void generarDeclaracion(String tipo, String nombre) {
@@ -256,5 +330,7 @@ public class GeneradorCodigoIntermedio {
     contadorEtiquetas = 0;
     instrucciones.clear();
     contextosIf.clear();
+    contextosFor.clear();
+    instruccionesDiferidas = null;
   }
 }
