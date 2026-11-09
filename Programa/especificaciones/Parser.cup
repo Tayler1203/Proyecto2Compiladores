@@ -1959,6 +1959,10 @@ SENTENCIA_BREAK ::=
       BREAK:b FIN_EXPR
       {:
           validarBreak(bleft);
+
+          if (tablaSimbolos.estaDentroDeCiclo()) {
+              generador.generarBreak();
+          }
       :}
     ;
 

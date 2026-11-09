@@ -54,6 +54,7 @@ public class GeneradorCodigoIntermedio {
   private final Deque<ContextoIf> contextosIf = new ArrayDeque<>();
   private final Deque<ContextoFor> contextosFor = new ArrayDeque<>();
   private final Deque<ContextoWhile> contextosWhile = new ArrayDeque<>();
+  private final Deque<String> etiquetasFinCiclos = new ArrayDeque<>();
   private final Deque<String> parametrosPendientes = new ArrayDeque<>();
   private List<String> instruccionesDiferidas;
 
@@ -247,18 +248,28 @@ public class GeneradorCodigoIntermedio {
     String base = funcion + "_for_" + contadorEtiquetas++;
 
     ContextoFor contexto = new ContextoFor(base);
+
     contextosFor.push(contexto);
+    etiquetasFinCiclos.push(contexto.etiquetaFin);
+
     emitirEtiqueta(contexto.etiquetaCondicion);
   }
 
   public void evaluarCondicionFor(ResultadoExpresion condicion) {
     ContextoFor contexto = obtenerContextoFor();
 
-    emitirSaltoCondicionalFalso(
-        condicion, contexto.etiquetaFin
-    );
+    if (condicion != null
+        && "bool".equals(condicion.getTipo())
+        && condicion.getLugar() != null) {
+      emitir(
+          "if " + condicion.getLugar()
+          + " goto " + contexto.etiquetaCuerpo
+      );
+    }
 
+    emitir("goto " + contexto.etiquetaFin);
     emitirEtiqueta(contexto.etiquetaCuerpo);
+
     instruccionesDiferidas = new ArrayList<>();
   }
 
@@ -284,6 +295,7 @@ public class GeneradorCodigoIntermedio {
     emitir("goto " + contexto.etiquetaCondicion);
     emitirEtiqueta(contexto.etiquetaFin);
 
+    etiquetasFinCiclos.pop();
     contextosFor.pop();
   }
 
@@ -291,7 +303,9 @@ public class GeneradorCodigoIntermedio {
     String base = funcion + "_while_" + contadorEtiquetas++;
 
     ContextoWhile contexto = new ContextoWhile(base);
+
     contextosWhile.push(contexto);
+    etiquetasFinCiclos.push(base + "_fin");
 
     emitirEtiqueta(base + "_inicio");
   }
@@ -317,6 +331,16 @@ public class GeneradorCodigoIntermedio {
 
     emitir("goto " + contexto.base + "_inicio");
     emitirEtiqueta(contexto.base + "_fin");
+
+    etiquetasFinCiclos.pop();
+  }
+
+  public void generarBreak() {
+    if (etiquetasFinCiclos.isEmpty()) {
+      return;
+    }
+
+    emitir("goto " + etiquetasFinCiclos.peek());
   }
 
   private void emitirSaltoCondicionalFalso(
@@ -447,6 +471,7 @@ public class GeneradorCodigoIntermedio {
     contextosIf.clear();
     contextosFor.clear();
     contextosWhile.clear();
+    etiquetasFinCiclos.clear();
     parametrosPendientes.clear();
     instruccionesDiferidas = null;
   }
