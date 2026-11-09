@@ -11,24 +11,31 @@ import java.util.List;
 public class GeneradorCodigoIntermedio {
 
   private static class ContextoIf {
+    private final String base;
     private final String etiquetaFin;
     private String etiquetaFalsa;
     private boolean tieneSaltoAFin;
+    private int contadorElif;
 
-    private ContextoIf(String etiquetaFin, String etiquetaFalsa) {
-      this.etiquetaFin = etiquetaFin;
-      this.etiquetaFalsa = etiquetaFalsa;
+    private ContextoIf(String base) {
+      this.base = base;
+      this.etiquetaFin = base + "_fin";
+      this.etiquetaFalsa = base + "_siguiente";
     }
   }
 
   private static class ContextoFor {
     private final String etiquetaCondicion;
+    private final String etiquetaCuerpo;
+    private final String etiquetaIncremento;
     private final String etiquetaFin;
     private List<String> instruccionesIncremento = new ArrayList<>();
 
-    private ContextoFor(String etiquetaCondicion, String etiquetaFin) {
-      this.etiquetaCondicion = etiquetaCondicion;
-      this.etiquetaFin = etiquetaFin;
+    private ContextoFor(String base) {
+      this.etiquetaCondicion = base + "_comparacion";
+      this.etiquetaCuerpo = base + "_cuerpo";
+      this.etiquetaIncremento = base + "_incremento";
+      this.etiquetaFin = base + "_fin";
     }
   }
 
@@ -159,34 +166,54 @@ public class GeneradorCodigoIntermedio {
     return "L" + contadorEtiquetas++;
   }
 
-  public void iniciarIf(ResultadoExpresion condicion) {
-    ContextoIf contexto = new ContextoIf(
-        nuevaEtiqueta(),
-        nuevaEtiqueta()
-    );
+  public void iniciarIf(ResultadoExpresion condicion, String funcion) {
+    String base = funcion + "_if_" + contadorEtiquetas++;
+
+    ContextoIf contexto = new ContextoIf(base);
     contextosIf.push(contexto);
+
     emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFalsa);
+    emitirEtiqueta(base + "_bloque");
   }
 
   public void iniciarElif() {
     ContextoIf contexto = obtenerContextoIf();
+
     emitir("goto " + contexto.etiquetaFin);
     emitirEtiqueta(contexto.etiquetaFalsa);
-    contexto.etiquetaFalsa = nuevaEtiqueta();
+
+    contexto.contadorElif++;
+
+    contexto.etiquetaFalsa =
+        contexto.base + "_elif_"
+        + contexto.contadorElif + "_siguiente";
+
     contexto.tieneSaltoAFin = true;
   }
 
   public void evaluarElif(ResultadoExpresion condicion) {
     ContextoIf contexto = obtenerContextoIf();
-    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFalsa);
+
+    emitirSaltoCondicionalFalso(
+        condicion, contexto.etiquetaFalsa
+    );
+
+    emitirEtiqueta(
+        contexto.base + "_elif_"
+        + contexto.contadorElif + "_bloque"
+    );
   }
 
   public void iniciarElse() {
     ContextoIf contexto = obtenerContextoIf();
+
     emitir("goto " + contexto.etiquetaFin);
     emitirEtiqueta(contexto.etiquetaFalsa);
+
     contexto.etiquetaFalsa = null;
     contexto.tieneSaltoAFin = true;
+
+    emitirEtiqueta(contexto.base + "_else_bloque");
   }
 
   public void terminarIf() {
@@ -203,18 +230,22 @@ public class GeneradorCodigoIntermedio {
     contextosIf.pop();
   }
 
-  public void iniciarFor() {
-    ContextoFor contexto = new ContextoFor(
-        nuevaEtiqueta(),
-        nuevaEtiqueta()
-    );
+  public void iniciarFor(String funcion) {
+    String base = funcion + "_for_" + contadorEtiquetas++;
+
+    ContextoFor contexto = new ContextoFor(base);
     contextosFor.push(contexto);
     emitirEtiqueta(contexto.etiquetaCondicion);
   }
 
   public void evaluarCondicionFor(ResultadoExpresion condicion) {
     ContextoFor contexto = obtenerContextoFor();
-    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFin);
+
+    emitirSaltoCondicionalFalso(
+        condicion, contexto.etiquetaFin
+    );
+
+    emitirEtiqueta(contexto.etiquetaCuerpo);
     instruccionesDiferidas = new ArrayList<>();
   }
 
@@ -233,9 +264,13 @@ public class GeneradorCodigoIntermedio {
 
   public void terminarFor() {
     ContextoFor contexto = obtenerContextoFor();
+
+    emitirEtiqueta(contexto.etiquetaIncremento);
     instrucciones.addAll(contexto.instruccionesIncremento);
+
     emitir("goto " + contexto.etiquetaCondicion);
     emitirEtiqueta(contexto.etiquetaFin);
+
     contextosFor.pop();
   }
 

@@ -1953,7 +1953,14 @@ SENTENCIA_IF ::=
       IF PAR_INI EXPRESION:cond PAR_FIN
       {:
           validarCondicion(obtenerTipo(cond), "if", condleft);
-          generador.iniciarIf(cond);
+
+          String funcion = tablaSimbolos.obtenerNombreFuncionActual();
+
+          if (funcion == null) {
+              funcion = "global";
+          }
+
+          generador.iniciarIf(cond, funcion);
           abrirAmbitoEstructura("if");
       :}
       BLOQUE_CONTROL
@@ -2065,7 +2072,14 @@ SENTENCIA_FOR ::=
       :}
       SENTENCIA_FOR_INIT
       {:
-          generador.iniciarFor();
+          String funcion =
+              tablaSimbolos.obtenerNombreFuncionActual();
+
+          if (funcion == null) {
+              funcion = "global";
+          }
+
+          generador.iniciarFor(funcion);
       :}
       EXPRESION:cond FIN_EXPR
       {:
