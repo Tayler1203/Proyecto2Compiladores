@@ -1033,9 +1033,15 @@ DECLARACION_GLOBAL ::=
 
 FUNCION_MAIN ::=
       VOID PRINCIPAL PAR_INI PAR_FIN
-      {: tablaSimbolos.abrirAmbito("principal"); :}
+      {:
+          tablaSimbolos.abrirAmbito("principal");
+          generador.iniciarFuncion("principal");
+      :}
       BLOQUE_FUNCION
-      {: tablaSimbolos.cerrarAmbito(); :}
+      {:
+          generador.terminarFuncion("principal");
+          tablaSimbolos.cerrarAmbito();
+      :}
     ;
 
 
@@ -1069,6 +1075,11 @@ PARAMETRO ::=
           registrarSimbolo(
               (String) id, tipo, idleft, "parametro"
           );
+
+          generador.registrarParametro(
+              (String) tipo, (String) id
+          );
+
           RESULT = tipo;
       :}
     ;
@@ -1114,10 +1125,12 @@ DECLARACION_FUNCION ::=
               new ArrayList<String>(),
               idleft
           );
+          generador.iniciarFuncion((String) id);
       :}
       BLOQUE_FUNCION
       {:
           validarReturnObligatorio((String) id, idleft);
+          generador.terminarFuncion((String) id);
           tablaSimbolos.cerrarAmbito();
       :}
     ;
@@ -1136,10 +1149,14 @@ DECLARACION_FUNCION ::=
           registrarFirmaFuncion(
               (String) id, tipos, idleft
           );
+
+          generador.iniciarFuncion((String) id);
+          generador.emitirParametros();
       :}
       BLOQUE_FUNCION
       {:
           validarReturnObligatorio((String) id, idleft);
+          generador.terminarFuncion((String) id);
           tablaSimbolos.cerrarAmbito();
       :}
     ;
@@ -1933,6 +1950,7 @@ SENTENCIA_RETURN ::=
       RETURN:r EXPRESION:expr FIN_EXPR
       {:
           validarReturn(obtenerTipo(expr), rleft);
+          generador.generarReturn(expr);
       :}
     ;
 

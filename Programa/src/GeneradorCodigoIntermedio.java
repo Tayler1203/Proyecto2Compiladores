@@ -54,6 +54,7 @@ public class GeneradorCodigoIntermedio {
   private final Deque<ContextoIf> contextosIf = new ArrayDeque<>();
   private final Deque<ContextoFor> contextosFor = new ArrayDeque<>();
   private final Deque<ContextoWhile> contextosWhile = new ArrayDeque<>();
+  private final Deque<String> parametrosPendientes = new ArrayDeque<>();
   private List<String> instruccionesDiferidas;
 
   public ResultadoExpresion crearResultado(String tipo, String lugar) {
@@ -373,6 +374,32 @@ public class GeneradorCodigoIntermedio {
     emitir("data_" + tipo + " " + nombre);
   }
 
+  public void registrarParametro(String tipo, String nombre) {
+    parametrosPendientes.addLast("param_" + tipo + " " + nombre);
+  }
+
+  public void emitirParametros() {
+    while (!parametrosPendientes.isEmpty()) {
+      emitir(parametrosPendientes.removeFirst());
+    }
+  }
+
+  public void iniciarFuncion(String nombre) {
+    emitir("func " + nombre + ":");
+  }
+
+  public void terminarFuncion(String nombre) {
+    emitir("endfunc " + nombre);
+  }
+
+  public void generarReturn(ResultadoExpresion expresion) {
+    if (expresion == null || expresion.getLugar() == null) {
+      return;
+    }
+
+    emitir("return " + expresion.getLugar());
+  }
+
   public void generarAsignacionInicial(
       String nombre,
       ResultadoExpresion expresion
@@ -408,6 +435,7 @@ public class GeneradorCodigoIntermedio {
     contextosIf.clear();
     contextosFor.clear();
     contextosWhile.clear();
+    parametrosPendientes.clear();
     instruccionesDiferidas = null;
   }
 }
