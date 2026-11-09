@@ -242,7 +242,7 @@ parser code {:
 
     public String validarAccesoArreglo(
         String nombre,
-        String tipoIndice,
+        ResultadoExpresion indice,
         int linea
     ) {
         TablaSimbolos.Simbolo simbolo =
@@ -262,6 +262,8 @@ parser code {:
             return null;
         }
 
+        String tipoIndice = obtenerTipo(indice);
+
         if (tipoIndice == null) {
             return null;
         }
@@ -274,6 +276,36 @@ parser code {:
                 + tipoIndice + "'."
             );
             return null;
+        }
+
+        Integer tamano = simbolo.getTamanoArreglo();
+
+        if (tamano != null && indice != null
+            && indice.getLugar() != null) {
+
+            String lugar = indice.getLugar();
+
+            if (lugar.matches("-?[0-9]+")) {
+                try {
+                    int posicion = Integer.parseInt(lugar);
+
+                    if (posicion < 0 || posicion >= tamano) {
+                        erroresSemanticos.add(
+                            "[ERROR SEMANTICO] Linea " + linea
+                            + ": indice " + posicion
+                            + " fuera de los limites del arreglo '"
+                            + nombre + "' de tamaño " + tamano + "."
+                        );
+                        return null;
+                    }
+                } catch (NumberFormatException e) {
+                    erroresSemanticos.add(
+                        "[ERROR SEMANTICO] Linea " + linea
+                        + ": indice entero fuera de rango."
+                    );
+                    return null;
+                }
+            }
         }
 
         String tipo = simbolo.getTipo();
@@ -658,7 +690,7 @@ parser code {:
     ) {
         String tipo = validarAccesoArreglo(
             nombre,
-            obtenerTipo(indice),
+            indice,
             linea
         );
 
@@ -1852,6 +1884,12 @@ ARREGLO ::=
       ASIGNACION BLOQUE_INI BLOQUE_FIN FIN_EXPR
       {:
           registrarArreglo((String) id, tipo, tamano, null, idleft);
+
+          if (tamano != null && tamano > 0) {
+              generador.generarDeclaracionArreglo(
+                  tipo, (String) id, tamano
+              );
+          }
       :}
 
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN
@@ -1861,11 +1899,27 @@ ARREGLO ::=
               (String) id, tipo, tamano,
               obtenerTipos(elementos), idleft
           );
+
+          if (tamano != null && tamano > 0) {
+              generador.generarDeclaracionArreglo(
+                  tipo, (String) id, tamano
+              );
+
+              generador.generarInicializacionArreglo(
+                  (String) id, elementos
+              );
+          }
       :}
 
     | VAL TIPO:tipo ID:id COR_INI TAMANO_ARREGLO:tamano COR_FIN FIN_EXPR
       {:
           registrarArreglo((String) id, tipo, tamano, null, idleft);
+
+          if (tamano != null && tamano > 0) {
+              generador.generarDeclaracionArreglo(
+                  tipo, (String) id, tamano
+              );
+          }
       :}
     ;
 
@@ -1897,14 +1951,35 @@ ACCESO_ARREGLO ::=
    ========================================== */
 
 ASIGNACION_ARREGLO ::=
-      ACCESO_ARREGLO:elemento
+      ID:id COR_INI INDICE:indice COR_FIN
       ASIGNACION EXPRESION:valor FIN_EXPR
       {:
-          validarAsignacionArreglo(
-              obtenerTipo(elemento),
-              obtenerTipo(valor),
-              elementoleft
+          String nombre = (String) id;
+
+          String tipoElemento = validarAccesoArreglo(
+              nombre,
+              indice,
+              idleft
           );
+
+          validarAsignacionArreglo(
+              tipoElemento,
+              obtenerTipo(valor),
+              idleft
+          );
+
+          if (tipoElemento != null
+              && tipoElemento.equals(obtenerTipo(valor))
+              && indice != null
+              && indice.getLugar() != null
+              && valor != null
+              && valor.getLugar() != null) {
+              generador.generarAsignacionElementoArreglo(
+                  nombre,
+                  indice,
+                  valor
+              );
+          }
       :}
     ;
 
@@ -1967,6 +2042,11 @@ OPERANDO_WRITE ::=
           RESULT = generador.crearResultado(
               "string", (String) valor
           );
+      :}
+
+    | ACCESO_ARREGLO:elemento
+      {:
+          RESULT = elemento;
       :}
     ;
 
