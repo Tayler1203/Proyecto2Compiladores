@@ -202,7 +202,8 @@ public class GeneradorCodigoIntermedio {
     ContextoIf contexto = new ContextoIf(base);
     contextosIf.push(contexto);
 
-    emitirSaltoCondicionalFalso(condicion, contexto.etiquetaFalsa);
+    emitirSaltoCondicionalVerdadero(condicion, base + "_bloque");
+    emitir("goto " + contexto.etiquetaFalsa);
     emitirEtiqueta(base + "_bloque");
   }
 
@@ -224,9 +225,12 @@ public class GeneradorCodigoIntermedio {
   public void evaluarElif(ResultadoExpresion condicion) {
     ContextoIf contexto = obtenerContextoIf();
 
-    emitirSaltoCondicionalFalso(
-        condicion, contexto.etiquetaFalsa
+    emitirSaltoCondicionalVerdadero(
+        condicion,
+        contexto.base + "_elif_"
+        + contexto.contadorElif + "_bloque"
     );
+    emitir("goto " + contexto.etiquetaFalsa);
 
     emitirEtiqueta(
         contexto.base + "_elif_"
@@ -359,19 +363,17 @@ public class GeneradorCodigoIntermedio {
     emitir("goto " + etiquetasFinCiclos.peek());
   }
 
-  private void emitirSaltoCondicionalFalso(
+  private void emitirSaltoCondicionalVerdadero(
       ResultadoExpresion condicion,
-      String etiquetaFalsa
+      String etiquetaVerdadera
   ) {
     if (condicion != null
         && "bool".equals(condicion.getTipo())
         && condicion.getLugar() != null) {
       emitir(
-          "ifFalse " + condicion.getLugar()
-          + " goto " + etiquetaFalsa
+          "if " + condicion.getLugar()
+          + " goto " + etiquetaVerdadera
       );
-    } else {
-      emitir("goto " + etiquetaFalsa);
     }
   }
 
