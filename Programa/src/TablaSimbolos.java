@@ -167,6 +167,13 @@ public final class TablaSimbolos {
         return null;
     }
 
+    /**
+     * Nombre: estaDentroDeCiclo
+     * Descripcion: Comprueba si el ambito actual pertenece a un ciclo.
+     * Salidas: No hay.
+     *
+     * @return true si existe un ciclo activo; false en otro caso.
+     */
     public boolean estaDentroDeCiclo() {
         for (Ambito ambito : pilaAmbitos) {
             String nombre = ambito.getNombre();

@@ -11,6 +11,13 @@ parser code {:
     private final GeneradorCodigoIntermedio generador =
         new GeneradorCodigoIntermedio();
 
+    /**
+     * Nombre: getGenerador
+     * Descripcion: Obtiene el generador de codigo intermedio del parser.
+     * Salidas: No hay.
+     *
+     * @return Generador de codigo intermedio.
+     */
     public GeneradorCodigoIntermedio getGenerador() {
         return generador;
     }
@@ -19,6 +26,13 @@ parser code {:
 
     private final java.util.Map<String, Integer> contadoresAmbitos = new java.util.HashMap<>();
 
+    /**
+     * Nombre: abrirAmbitoEstructura
+     * Descripcion: Abre un ambito para una estructura de control.
+     * Salidas: No hay.
+     *
+     * @param tipo Tipo de estructura que define el ambito.
+     */
     private void abrirAmbitoEstructura(String tipo) {
         int numero = contadoresAmbitos.getOrDefault(tipo, 0) + 1;
         contadoresAmbitos.put(tipo, numero);
@@ -27,6 +41,16 @@ parser code {:
 
     private boolean encontroReturn = false;
 
+    /**
+     * Nombre: registrarSimbolo
+     * Descripcion: Registra un simbolo en la tabla de simbolos.
+     * Salidas: Registra un error semantico si el simbolo ya existe.
+     *
+     * @param nombre Nombre del simbolo.
+     * @param tipo Tipo del simbolo.
+     * @param linea Linea de declaracion.
+     * @param categoria Categoria del simbolo.
+     */
     public void registrarSimbolo(
         String nombre,
         String tipo,
@@ -48,7 +72,9 @@ parser code {:
     }
 
     /**
-     * Comprueba que un identificador exista en un ambito accesible.
+     * Nombre: validarIdentificador
+     * Descripcion: Comprueba que un identificador exista en un ambito accesible.
+     * Salidas: Registra un error semantico si el identificador no existe.
      *
      * @param nombre Nombre del identificador.
      * @param linea Linea donde se utiliza.
@@ -67,6 +93,14 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarRead
+     * Descripcion: Valida que un identificador pueda utilizarse en una lectura.
+     * Salidas: Registra errores semanticos cuando la lectura no es valida.
+     *
+     * @param nombre Nombre del identificador.
+     * @param linea Linea donde se utiliza.
+     */
     public void validarRead(String nombre, int linea) {
         TablaSimbolos.Simbolo simbolo =
             tablaSimbolos.buscarSimbolo(nombre);
@@ -99,6 +133,14 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarWriteIdentificador
+     * Descripcion: Valida que un identificador pueda utilizarse en una escritura.
+     * Salidas: Registra errores semanticos cuando la escritura no es valida.
+     *
+     * @param nombre Nombre del identificador.
+     * @param linea Linea donde se utiliza.
+     */
     public void validarWriteIdentificador(String nombre, int linea) {
         TablaSimbolos.Simbolo simbolo =
             tablaSimbolos.buscarSimbolo(nombre);
@@ -121,6 +163,14 @@ parser code {:
         validarWriteTipo(simbolo.getTipo(), linea);
     }
 
+    /**
+     * Nombre: validarWriteTipo
+     * Descripcion: Valida que un tipo pueda utilizarse en una escritura.
+     * Salidas: Registra un error semantico cuando el tipo no es valido.
+     *
+     * @param tipo Tipo del valor.
+     * @param linea Linea donde se utiliza.
+     */
     public void validarWriteTipo(String tipo, int linea) {
         if (tipo == null) {
             return;
@@ -137,6 +187,13 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarBreak
+     * Descripcion: Valida que break se encuentre dentro de un ciclo.
+     * Salidas: Registra un error semantico si no hay un ciclo activo.
+     *
+     * @param linea Linea donde aparece break.
+     */
     public void validarBreak(int linea) {
         if (!tablaSimbolos.estaDentroDeCiclo()) {
             erroresSemanticos.add(
@@ -146,6 +203,14 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarReturn
+     * Descripcion: Valida el retorno de una funcion contra su tipo declarado.
+     * Salidas: Registra errores semanticos cuando el retorno no es valido.
+     *
+     * @param tipoExpresion Tipo de la expresion retornada.
+     * @param linea Linea donde aparece return.
+     */
     public void validarReturn(String tipoExpresion, int linea) {
         String nombre = tablaSimbolos.obtenerNombreFuncionActual();
 
@@ -186,6 +251,14 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarReturnObligatorio
+     * Descripcion: Verifica que una funcion tenga al menos una instruccion return.
+     * Salidas: Registra un error semantico si no se encontro return.
+     *
+     * @param nombre Nombre de la funcion.
+     * @param linea Linea utilizada para reportar el error.
+     */
     public void validarReturnObligatorio(String nombre, int linea) {
         if (!encontroReturn) {
             erroresSemanticos.add(
@@ -196,6 +269,17 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarArreglo
+     * Descripcion: Valida el tamaño y los tipos de los elementos de un arreglo.
+     * Salidas: Registra errores semanticos cuando el arreglo no es valido.
+     *
+     * @param nombre Nombre del arreglo.
+     * @param tipo Tipo de sus elementos.
+     * @param tamano Tamaño declarado.
+     * @param elementos Tipos de los elementos iniciales.
+     * @param linea Linea de declaracion.
+     */
     public void validarArreglo(
         String nombre,
         String tipo,
@@ -240,6 +324,16 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarAccesoArreglo
+     * Descripcion: Valida el acceso a un elemento de arreglo.
+     * Salidas: Devuelve el tipo del elemento o registra un error semantico.
+     *
+     * @param nombre Nombre del arreglo.
+     * @param indice Expresion utilizada como indice.
+     * @param linea Linea donde se realiza el acceso.
+     * @return Tipo del elemento, o null si el acceso no es valido.
+     */
     public String validarAccesoArreglo(
         String nombre,
         ResultadoExpresion indice,
@@ -312,6 +406,17 @@ parser code {:
         return tipo.substring(0, tipo.length() - 2);
     }
 
+    /**
+     * Nombre: registrarArreglo
+     * Descripcion: Registra un arreglo y valida su declaracion.
+     * Salidas: Registra errores semanticos cuando el arreglo no es valido.
+     *
+     * @param nombre Nombre del arreglo.
+     * @param tipo Tipo de sus elementos.
+     * @param tamano Tamaño del arreglo.
+     * @param elementos Elementos iniciales.
+     * @param linea Linea de declaracion.
+     */
     public void registrarArreglo(
         String nombre,
         String tipo,
@@ -334,6 +439,15 @@ parser code {:
         validarArreglo(nombre, tipo, tamano, elementos, linea);
     }
 
+    /**
+     * Nombre: validarAsignacionArreglo
+     * Descripcion: Valida la asignacion de un valor a un elemento de arreglo.
+     * Salidas: Registra un error semantico si los tipos son incompatibles.
+     *
+     * @param tipoElemento Tipo del elemento del arreglo.
+     * @param tipoValor Tipo del valor asignado.
+     * @param linea Linea donde se realiza la asignacion.
+     */
     public void validarAsignacionArreglo(
         String tipoElemento,
         String tipoValor,
@@ -353,6 +467,16 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarTipoAsignacion
+     * Descripcion: Valida la asignacion de una expresion a una variable.
+     * Salidas: Registra un error semantico si los tipos son incompatibles.
+     *
+     * @param nombre Nombre de la variable.
+     * @param tipoDeclarado Tipo declarado de la variable.
+     * @param tipoExpresion Tipo de la expresion.
+     * @param linea Linea donde se realiza la asignacion.
+     */
     public void validarTipoAsignacion(
         String nombre,
         String tipoDeclarado,
@@ -375,6 +499,17 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarOperacionAritmetica
+     * Descripcion: Valida una operacion aritmetica y determina su tipo resultante.
+     * Salidas: Registra un error semantico si los operandos no son compatibles.
+     *
+     * @param tipoOperandoIzquierdo Tipo del operando izquierdo.
+     * @param tipoOperandoDerecho Tipo del operando derecho.
+     * @param operador Operador aritmetico.
+     * @param linea Linea donde aparece la operacion.
+     * @return Tipo resultante, o null si la operacion no es valida.
+     */
     public String validarOperacionAritmetica(
         String tipoOperandoIzquierdo,
         String tipoOperandoDerecho,
@@ -449,6 +584,17 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarOperacionRelacional
+     * Descripcion: Valida una operacion relacional entre dos operandos.
+     * Salidas: Registra un error semantico si los operandos no son compatibles.
+     *
+     * @param tipoOperandoIzquierdo Tipo del operando izquierdo.
+     * @param tipoOperandoDerecho Tipo del operando derecho.
+     * @param operador Operador relacional.
+     * @param linea Linea donde aparece la operacion.
+     * @return Tipo bool, o null si la operacion no es valida.
+     */
     public String validarOperacionRelacional(
         String tipoOperandoIzquierdo,
         String tipoOperandoDerecho,
@@ -503,6 +649,17 @@ parser code {:
         return "bool";
     }
 
+    /**
+     * Nombre: validarOperacionLogica
+     * Descripcion: Valida una operacion logica entre dos operandos.
+     * Salidas: Registra un error semantico si los operandos no son booleanos.
+     *
+     * @param tipoOperandoIzquierdo Tipo del operando izquierdo.
+     * @param tipoOperandoDerecho Tipo del operando derecho.
+     * @param operador Operador logico.
+     * @param linea Linea donde aparece la operacion.
+     * @return Tipo bool, o null si la operacion no es valida.
+     */
     public String validarOperacionLogica(
         String tipoOperandoIzquierdo,
         String tipoOperandoDerecho,
@@ -528,6 +685,15 @@ parser code {:
         return "bool";
     }
 
+    /**
+     * Nombre: validarNegacionLogica
+     * Descripcion: Valida la negacion logica de un operando.
+     * Salidas: Registra un error semantico si el operando no es booleano.
+     *
+     * @param tipoOperando Tipo del operando.
+     * @param linea Linea donde aparece la negacion.
+     * @return Tipo bool, o null si la operacion no es valida.
+     */
     public String validarNegacionLogica(
         String tipoOperando,
         int linea
@@ -548,6 +714,15 @@ parser code {:
         return "bool";
     }
 
+    /**
+     * Nombre: validarCondicion
+     * Descripcion: Valida que la condicion de una estructura sea booleana.
+     * Salidas: Registra un error semantico si la condicion no es valida.
+     *
+     * @param tipoCondicion Tipo de la condicion.
+     * @param estructura Nombre de la estructura de control.
+     * @param linea Linea donde aparece la condicion.
+     */
     public void validarCondicion(
         String tipoCondicion,
         String estructura,
@@ -567,6 +742,15 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: registrarFirmaFuncion
+     * Descripcion: Registra los tipos de parametros de una funcion.
+     * Salidas: Registra un error semantico si no se puede guardar la firma.
+     *
+     * @param nombre Nombre de la funcion.
+     * @param tiposParametros Tipos de los parametros.
+     * @param linea Linea de declaracion.
+     */
     public void registrarFirmaFuncion(
         String nombre,
         List<String> tiposParametros,
@@ -586,6 +770,16 @@ parser code {:
         }
     }
 
+    /**
+     * Nombre: validarLlamadaFuncion
+     * Descripcion: Valida los argumentos y el tipo de retorno de una llamada.
+     * Salidas: Registra errores semanticos si la llamada no es valida.
+     *
+     * @param nombre Nombre de la funcion.
+     * @param tiposArgumentos Tipos de los argumentos.
+     * @param linea Linea donde se realiza la llamada.
+     * @return Tipo de retorno, o null si la llamada no es valida.
+     */
     public String validarLlamadaFuncion(
         String nombre,
         List<String> tiposArgumentos,
@@ -631,6 +825,16 @@ parser code {:
         return hayError ? null : simbolo.getTipo();
     }
 
+    /**
+     * Nombre: validarIncrementoDecremento
+     * Descripcion: Valida el incremento o decremento de una variable.
+     * Salidas: Registra un error semantico si la operacion no es valida.
+     *
+     * @param nombre Nombre de la variable.
+     * @param operador Operador de incremento o decremento.
+     * @param linea Linea donde aparece la operacion.
+     * @return Tipo de la variable, o null si la operacion no es valida.
+     */
     public String validarIncrementoDecremento(
         String nombre,
         String operador,
@@ -659,10 +863,28 @@ parser code {:
         return tipo;
     }
 
+    /**
+     * Nombre: obtenerTipo
+     * Descripcion: Obtiene el tipo de una expresion cuando existe.
+     * Salidas: No hay.
+     *
+     * @param expresion Expresion que se consultara.
+     * @return Tipo de la expresion, o null si no existe.
+     */
     private String obtenerTipo(ResultadoExpresion expresion) {
         return expresion != null ? expresion.getTipo() : null;
     }
 
+    /**
+     * Nombre: procesarLlamadaFuncion
+     * Descripcion: Valida y genera una llamada a funcion.
+     * Salidas: Genera el resultado de la llamada.
+     *
+     * @param nombre Nombre de la funcion.
+     * @param argumentos Argumentos de la llamada.
+     * @param linea Linea donde se realiza la llamada.
+     * @return Resultado de la llamada.
+     */
     private ResultadoExpresion procesarLlamadaFuncion(
         String nombre,
         List<ResultadoExpresion> argumentos,
@@ -683,6 +905,16 @@ parser code {:
         );
     }
 
+    /**
+     * Nombre: procesarAccesoArreglo
+     * Descripcion: Valida y genera el acceso a un arreglo.
+     * Salidas: Genera el resultado del acceso.
+     *
+     * @param nombre Nombre del arreglo.
+     * @param indice Indice del arreglo.
+     * @param linea Linea donde se realiza el acceso.
+     * @return Resultado del acceso.
+     */
     private ResultadoExpresion procesarAccesoArreglo(
         String nombre,
         ResultadoExpresion indice,
@@ -699,6 +931,14 @@ parser code {:
         );
     }
 
+    /**
+     * Nombre: obtenerTipos
+     * Descripcion: Obtiene los tipos de una lista de expresiones.
+     * Salidas: No hay.
+     *
+     * @param expresiones Expresiones que se consultaran.
+     * @return Lista de tipos en el mismo orden.
+     */
     private List<String> obtenerTipos(
         List<ResultadoExpresion> expresiones
     ) {
@@ -711,6 +951,17 @@ parser code {:
         return tipos;
     }
 
+    /**
+     * Nombre: combinarOperacion
+     * Descripcion: Valida y genera una operacion aritmetica.
+     * Salidas: Genera el resultado de la operacion.
+     *
+     * @param izquierdo Operando izquierdo.
+     * @param derecho Operando derecho.
+     * @param operador Operador aritmetico.
+     * @param linea Linea de la operacion.
+     * @return Resultado de la operacion.
+     */
     private ResultadoExpresion combinarOperacion(
         ResultadoExpresion izquierdo,
         ResultadoExpresion derecho,
@@ -724,6 +975,17 @@ parser code {:
         return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
     }
 
+    /**
+     * Nombre: combinarOperacionRelacional
+     * Descripcion: Valida y genera una operacion relacional.
+     * Salidas: Genera el resultado de la operacion.
+     *
+     * @param izquierdo Operando izquierdo.
+     * @param derecho Operando derecho.
+     * @param operador Operador relacional.
+     * @param linea Linea de la operacion.
+     * @return Resultado de la operacion.
+     */
     private ResultadoExpresion combinarOperacionRelacional(
         ResultadoExpresion izquierdo,
         ResultadoExpresion derecho,
@@ -737,6 +999,17 @@ parser code {:
         return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
     }
 
+    /**
+     * Nombre: combinarOperacionLogica
+     * Descripcion: Valida y genera una operacion logica.
+     * Salidas: Genera el resultado de la operacion.
+     *
+     * @param izquierdo Operando izquierdo.
+     * @param derecho Operando derecho.
+     * @param operador Operador logico.
+     * @param linea Linea de la operacion.
+     * @return Resultado de la operacion.
+     */
     private ResultadoExpresion combinarOperacionLogica(
         ResultadoExpresion izquierdo,
         ResultadoExpresion derecho,
@@ -750,6 +1023,15 @@ parser code {:
         return generador.crearOperacionBinaria(izquierdo, derecho, operador, tipo);
     }
 
+    /**
+     * Nombre: combinarNegacionLogica
+     * Descripcion: Valida y genera una negacion logica.
+     * Salidas: Genera el resultado de la negacion.
+     *
+     * @param operando Operando que se negara.
+     * @param linea Linea de la operacion.
+     * @return Resultado de la negacion.
+     */
     private ResultadoExpresion combinarNegacionLogica(
         ResultadoExpresion operando,
         int linea
@@ -759,18 +1041,46 @@ parser code {:
         return generador.crearNegacion(operando, tipo);
     }
 
+    /**
+     * Nombre: huboErrorSemantico
+     * Descripcion: Comprueba si se registraron errores semanticos.
+     * Salidas: No hay.
+     *
+     * @return true si existe al menos un error semantico.
+     */
     public boolean huboErrorSemantico() {
         return !erroresSemanticos.isEmpty();
     }
 
+    /**
+     * Nombre: getTablaSimbolos
+     * Descripcion: Obtiene la tabla de simbolos utilizada por el parser.
+     * Salidas: No hay.
+     *
+     * @return Tabla de simbolos del programa.
+     */
     public TablaSimbolos getTablaSimbolos() {
         return tablaSimbolos;
     }
 
+    /**
+     * Nombre: huboErrorSintactico
+     * Descripcion: Comprueba si se registraron errores sintacticos.
+     * Salidas: No hay.
+     *
+     * @return true si existe al menos un error sintactico.
+     */
     public boolean huboErrorSintactico() {
         return !erroresSintacticos.isEmpty();
     }
 
+    /**
+     * Nombre: syntax_error
+     * Descripcion: Registra un error sintactico recuperable.
+     * Salidas: Imprime y almacena el mensaje del error.
+     *
+     * @param s Simbolo que produjo el error.
+     */
     public void syntax_error(Symbol s) {
 
         String lexema =
@@ -812,6 +1122,13 @@ parser code {:
         erroresSintacticos.add(mensaje);
     }
 
+    /**
+     * Nombre: unrecovered_syntax_error
+     * Descripcion: Registra un error sintactico irrecuperable.
+     * Salidas: Imprime y almacena el mensaje del error.
+     *
+     * @param s Simbolo que produjo el error.
+     */
     public void unrecovered_syntax_error(Symbol s) {
 
         int linea =
