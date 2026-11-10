@@ -9,10 +9,10 @@ Tayler Wynta Rodriguez - 2024143103
 Maikel Flores Navarro - 2024148346
 
 # Numero de proyecto programado
-Proyecto 1
+Proyecto 2
 
 # Fecha de entrega
-03/10/2026
+09/10/2026
 
 # Estatus de la entrega
 Excelente
